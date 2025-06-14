@@ -1,69 +1,44 @@
-import '~/global.css';
-
-import { DarkTheme, DefaultTheme, Theme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import * as React from 'react';
-import { Platform } from 'react-native';
-import { NAV_THEME } from '~/lib/constants';
-import { useColorScheme } from '~/lib/useColorScheme';
-import { PortalHost } from '@rn-primitives/portal';
-import { ThemeToggle } from '~/components/ThemeToggle';
-import { setAndroidNavigationBar } from '~/lib/android-navigation-bar';
-
-const LIGHT_THEME: Theme = {
-  ...DefaultTheme,
-  colors: NAV_THEME.light,
-};
-const DARK_THEME: Theme = {
-  ...DarkTheme,
-  colors: NAV_THEME.dark,
-};
-
-export {
-  // Catch any errors thrown by the Layout component.
-  ErrorBoundary,
-} from 'expo-router';
+import "~/global.css";
+import 'react-native-reanimated';
+import { Stack, usePathname } from "expo-router";
+import BottomNavigator from "../navigation/BottomNavigator";
+import { WorkoutProvider } from '../contexts/WorkoutContext';
+import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
+import Toast from 'react-native-toast-message'
+import { useWindowDimensions } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function RootLayout() {
-  const hasMounted = React.useRef(false);
-  const { colorScheme, isDarkColorScheme } = useColorScheme();
-  const [isColorSchemeLoaded, setIsColorSchemeLoaded] = React.useState(false);
+  const pathname = usePathname();
+  const { width, height } = useWindowDimensions()
 
-  useIsomorphicLayoutEffect(() => {
-    if (hasMounted.current) {
-      return;
-    }
-
-    if (Platform.OS === 'web') {
-      // Adds the background color to the html element to prevent white background on overscroll.
-      document.documentElement.classList.add('bg-background');
-    }
-    setAndroidNavigationBar(colorScheme);
-    setIsColorSchemeLoaded(true);
-    hasMounted.current = true;
-  }, []);
-
-  if (!isColorSchemeLoaded) {
-    return null;
-  }
+  // Hide Bottom Navigator on specific screens
+  const shouldHideBottomNav = pathname.startsWith("/workout/") || pathname.startsWith("/exercise/") || pathname.startsWith("/account/"); // Hide on dynamic workout pages
 
   return (
-    <ThemeProvider value={isDarkColorScheme ? DARK_THEME : LIGHT_THEME}>
-      <StatusBar style={isDarkColorScheme ? 'light' : 'dark'} />
-      <Stack>
-        <Stack.Screen
-          name='index'
-          options={{
-            title: 'Starter Base',
-            headerRight: () => <ThemeToggle />,
-          }}
-        />
-      </Stack>
-      <PortalHost />
-    </ThemeProvider>
+    <WorkoutProvider>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <BottomSheetModalProvider>
+          <SafeAreaView style={{ flex: 1, width, height, backgroundColor: '#84BDEA' }} edges={['top', 'bottom']}>
+            {/* Stack Navigator */}
+            <Stack screenOptions={{ headerShown: false }} >
+              <Stack.Screen name="index" options={{ title: "Home" }} />
+              <Stack.Screen name="(tabs)/routines" />
+              <Stack.Screen name="(tabs)/library" />
+              <Stack.Screen name="(tabs)/workout" />
+              <Stack.Screen name="(tabs)/dietplan" />
+              <Stack.Screen name="(tabs)/account/index" />
+              <Stack.Screen name="workout/[id]" />
+              <Stack.Screen name="exercise/[id]" />
+            </Stack>
+
+            {/* Show Bottom Navigator only on main screens */}
+            {!shouldHideBottomNav && <BottomNavigator />}
+            <Toast />
+          </SafeAreaView>
+        </BottomSheetModalProvider>
+      </GestureHandlerRootView>
+    </WorkoutProvider>
   );
 }
-
-const useIsomorphicLayoutEffect =
-  Platform.OS === 'web' && typeof window === 'undefined' ? React.useEffect : React.useLayoutEffect;
