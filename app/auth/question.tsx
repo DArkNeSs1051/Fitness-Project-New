@@ -6,20 +6,24 @@ import {
   TextInput,
   TouchableOpacity,
   View,
+  Modal,
+  StyleSheet,
+  Keyboard, 
+  TouchableWithoutFeedback 
 } from "react-native";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import Arrow from "../../assets/images/Image/Arrow.svg";
-import MaleIcon from "../../assets/images/Image/MaleIcon.svg";
+import MaleIcon from '../../assets/images/Image/Maleicon.svg'
 import MaleIconWhite from "../../assets/images/Image/MaleIconWhite.svg";
-import FemaleIcon from "../../assets/images/Image/FemaleIcon.svg";
+import FemaleIcon from '../../assets/images/Image/Femaleicon.svg'
 import FemaleIconWhite from "../../assets/images/Image/FemaleIconWhite.svg";
 import Dumbbell from "../../assets/images/Image/Dumbbell.svg";
 import DumbbellWhite from "../../assets/images/Image/DumbbellWhite.svg";
-import FitnessGoal from "../../assets/images/Image/FitnessGoal.svg";
-import GymPreferIcon from "../../assets/images/Image/GymPreferIcon.svg";
+import FitnessGoal from '../../assets/images/Image/Fitnessgoal.svg'
+import GymPreferIcon from "../../assets/images/Image/GymPrefericon.svg";
 import GymPreferIconWhite from "../../assets/images/Image/GymPreferIconWhite.svg";
-import HomePreferIcon from "../../assets/images/Image/HomePreferIcon.svg";
+import HomePreferIcon from "../../assets/images/Image/HomePrefericon.svg";
 import HomePreferIconWhite from "../../assets/images/Image/HomePreferIconWhite.svg";
 import Workout from "../../assets/images/Image/Workout.svg";
 import NutritionIcon from "../../assets/images/Image/NutritionIcon.svg";
@@ -89,7 +93,23 @@ const Question = () => {
     height: "",
   });
 
-  const [showGenderPicker, setShowGenderPicker] = useState(false);
+  const [showDatePicker, setshowDatePicker] = useState(false);
+  const [tempDate, setTempDate] = useState<Date>(form.birthday ?? new Date());
+
+
+  const handleDateConfirm = (selectedDate: Date) => {
+  const ageYear = dayjs().diff(dayjs(selectedDate), 'year').toString();
+  setForm((prev) => ({
+    ...prev,
+    birthday: selectedDate,
+    age: ageYear,
+  }));
+  setErrors((prev) => ({
+    ...prev,
+    birthday: '',
+  }));
+  setshowDatePicker(false);
+};
 
   const onChangeForm = (key: string, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -116,6 +136,17 @@ const Question = () => {
       return newErrors;
     });
   };
+
+  const handleDateChange = (_: any, selectedDate?: Date) => {
+  if (!selectedDate) return;
+
+  if (Platform.OS === 'android') {
+    handleDateConfirm(selectedDate);
+  } else {
+    setTempDate(selectedDate);
+  }
+};
+
 
   const handleNextState = () => {
     if (states === 1) {
@@ -203,6 +234,7 @@ const Question = () => {
   };
 
   return (
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
     <View className={twMerge("flex-1 gap-5 bg-[#84BDEA]")}>
       <View className="h-[70px] flex flex-row justify-center items-center px-5 relative">
         {states !== 1 && (
@@ -286,7 +318,7 @@ const Question = () => {
                     name="calendar-outline"
                     size={25}
                     color="#142939"
-                    onPress={() => setShowGenderPicker(true)}
+                    onPress={() => setshowDatePicker(true)}
                   />
                 </TouchableOpacity>
               </View>
@@ -296,33 +328,56 @@ const Question = () => {
                 </Text>
               ) : null}
             </View>
-            {showGenderPicker && (
-              <DateTimePicker
-                value={form.birthday ?? new Date()}
-                mode="date"
-                display={Platform.OS === "ios" ? "spinner" : "default"}
-                onChange={(event, selectedDate) => {
-                  if (selectedDate) {
-                    const ageYear = dayjs()
-                      .diff(dayjs(selectedDate), "year")
-                      .toString();
-                    setForm((prev) => ({
-                      ...prev,
-                      birthday: selectedDate,
-                      age: ageYear,
-                    }));
-                    setErrors((prev) => ({
-                      ...prev,
-                      birthday: "",
-                    }));
-                    setShowGenderPicker(false);
-                  }
-                }}
-                maximumDate={new Date()}
-                minimumDate={new Date(1900, 0, 1)}
-                themeVariant="light"
-              />
-            )}
+            {showDatePicker && (
+            <>
+              {/* Android: show inline picker */}
+              {Platform.OS === 'android' && (
+                <DateTimePicker
+                  value={form.birthday ?? new Date()}
+                  mode="date"
+                  display="default"
+                  onChange={handleDateChange}
+                  maximumDate={new Date()}
+                  minimumDate={new Date(1900, 0, 1)}
+                  themeVariant="light"
+                />
+              )}
+
+              {/* iOS: show modal */}
+              {Platform.OS === 'ios' && (
+                <Modal
+                  transparent
+                  animationType="fade"
+                  visible={showDatePicker}
+                  onRequestClose={() => setshowDatePicker(false)}
+                >
+                  <View style={styles.modalOverlay}>
+                    <View style={styles.datePickerModalContent}>
+                      <View style={styles.modalHeader}>
+                        <TouchableOpacity onPress={() => setshowDatePicker(false)}>
+                          <Text style={styles.modalButtonText}>Cancel</Text>
+                        </TouchableOpacity>
+                        <Text style={styles.modalTitle}>Select Birthdate</Text>
+                        <TouchableOpacity onPress={() => handleDateConfirm(tempDate)}>
+                          <Text style={[styles.modalButtonText, styles.doneButton]}>Done</Text>
+                        </TouchableOpacity>
+                      </View>
+                      <DateTimePicker
+                        value={tempDate}
+                        mode="date"
+                        display="spinner"
+                        onChange={handleDateChange}
+                        maximumDate={new Date()}
+                        minimumDate={new Date(1900, 0, 1)}
+                        themeVariant="light"
+                        style={styles.dateTimePicker}
+                      />
+                    </View>
+                  </View>
+                </Modal>
+              )}
+            </>
+          )}
 
             {/* Weight */}
             <View className="flex flex-col h-[100px]">
@@ -342,8 +397,14 @@ const Question = () => {
                   <TouchableOpacity
                     onPress={() => onChangeForm("weightUnit", "kg")}
                     activeOpacity={1}
+                    className={unitButtonStyle(form.weightUnit === "kg")}
                   >
-                    <Text className={unitButtonStyle(form.weightUnit === "kg")}>
+                    <Text 
+                      className={twMerge(
+                        "text-[10px] text-center",
+                        form.weightUnit === "kg" ? "text-[#FDFDFF]" : "text-[#142939]"
+                      )}
+                    >
                       KG
                     </Text>
                   </TouchableOpacity>
@@ -351,9 +412,13 @@ const Question = () => {
                   <TouchableOpacity
                     onPress={() => onChangeForm("weightUnit", "lbs")}
                     activeOpacity={1}
+                    className={unitButtonStyle(form.weightUnit === "lbs")}
                   >
                     <Text
-                      className={unitButtonStyle(form.weightUnit === "lbs")}
+                      className={twMerge(
+                        "text-[10px] text-center",
+                        form.weightUnit === "lbs" ? "text-[#FDFDFF]" : "text-[#142939]"
+                      )}
                     >
                       Lbs
                     </Text>
@@ -385,8 +450,14 @@ const Question = () => {
                   <TouchableOpacity
                     onPress={() => onChangeForm("heightUnit", "cm")}
                     activeOpacity={1}
+                    className={unitButtonStyle(form.heightUnit === "cm")}
                   >
-                    <Text className={unitButtonStyle(form.heightUnit === "cm")}>
+                    <Text 
+                      className={twMerge(
+                        "text-[10px] text-center",
+                        form.heightUnit === "cm" ? "text-[#FDFDFF]" : "text-[#142939]"
+                      )}
+                    >
                       CM
                     </Text>
                   </TouchableOpacity>
@@ -394,8 +465,14 @@ const Question = () => {
                   <TouchableOpacity
                     onPress={() => onChangeForm("heightUnit", "ft")}
                     activeOpacity={1}
+                    className={unitButtonStyle(form.heightUnit === "ft")}
                   >
-                    <Text className={unitButtonStyle(form.heightUnit === "ft")}>
+                    <Text 
+                      className={twMerge(
+                        "text-[10px] text-center",
+                        form.heightUnit === "ft" ? "text-[#FDFDFF]" : "text-[#142939]"
+                      )}
+                    >
                       Ft
                     </Text>
                   </TouchableOpacity>
@@ -976,6 +1053,41 @@ const Question = () => {
         />
       </View>
     </View>
+    </TouchableWithoutFeedback>
   );
 };
 export default Question;
+
+const styles = StyleSheet.create({
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerModalContent: {
+    backgroundColor: 'white',
+    padding: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  modalTitle: {
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalButtonText: {
+    fontSize: 16,
+    color: '#5FA3D6',
+  },
+  doneButton: {
+    fontWeight: 'bold',
+  },
+  dateTimePicker: {
+    backgroundColor: 'white',
+  },
+});
