@@ -81,7 +81,9 @@ const SignUp = () => {
             lastName: form.lastName,
             email: form.emailAddress,
             createdAt: dayjs().toISOString(),
+            isFirstLogin: true,
           });
+
           router.replace("/workout");
         }
       } else {
