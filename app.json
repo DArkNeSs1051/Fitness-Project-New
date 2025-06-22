@@ -36,11 +36,26 @@
     },
     "plugins": [
       "expo-router",
-      "expo-video",
+       "expo-video",
+       
       {
           "supportsBackgroundPlayback": true,
           "supportsPictureInPicture": true
-      }
+      },
+
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": true,
+          "faceIDPermission": "Allow $(PRODUCT_NAME) to access your Face ID biometric data."
+        }
+      ],
+      [
+        "expo-web-browser",
+        {
+          "experimentalLauncherActivity": true
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true
