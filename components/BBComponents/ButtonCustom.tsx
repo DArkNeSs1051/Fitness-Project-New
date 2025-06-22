@@ -13,6 +13,7 @@ const ButtonCustom = (props: ButtonProps) => {
 
   return (
     <TouchableOpacity
+      activeOpacity={1}
       className={`w-[255px] h-[40px] rounded-2xl flex flex-row items-center justify-center gap-5`}
       style={{
         backgroundColor: bgColor || "#FFFFFF",

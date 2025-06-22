@@ -15,7 +15,6 @@ const SignIn = () => {
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
   const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
   const { user } = useUser();
-  const [loading, setLoading] = useState(false);
   const router = useRouter();
   const [form, setForm] = useState({
     emailAddress: "",
@@ -50,6 +49,7 @@ const SignIn = () => {
             firstName: user?.firstName || "",
             lastName: user?.lastName || "",
             createdAt: dayjs().toISOString(),
+            isFirstLogin: true,
           });
         }
 
@@ -83,7 +83,6 @@ const SignIn = () => {
 
   const onSignInGoogle = async () => {
     if (!authLoaded) return;
-    setLoading(true);
     try {
       const redirectUrl = Linking.createURL("/");
       const completeSignIn = await startOAuthFlow({ redirectUrl });
@@ -97,8 +96,6 @@ const SignIn = () => {
       }
     } catch (err: any) {
       alert(err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
-    } finally {
-      setLoading(false);
     }
   };
 
