@@ -1,5 +1,5 @@
-import "~/global.css";
 import 'react-native-reanimated';
+import "~/global.css";
 import { Stack, usePathname } from "expo-router";
 import BottomNavigator from "../navigation/BottomNavigator";
 import { WorkoutProvider } from '../contexts/WorkoutContext';

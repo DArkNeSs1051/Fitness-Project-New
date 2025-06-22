@@ -7,7 +7,7 @@ import { getAnalytics } from "firebase/analytics";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyCPulh5k-rtB6yUYRsh9hVmLOAJam6H_Nk",
+  apiKey: "AIzaSyCPulh5k-rtB6yUYRsh9hVmLOAJam6H_Nk", 
   authDomain: "fithealthproject-ba957.firebaseapp.com",
   projectId: "fithealthproject-ba957",
   storageBucket: "fithealthproject-ba957.firebasestorage.app",

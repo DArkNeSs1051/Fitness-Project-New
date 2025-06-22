@@ -300,7 +300,7 @@ export default function ProfileScreen() {
       <Modal
         visible={showGenderPicker}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowGenderPicker(false)}
       >
         <View style={styles.modalOverlay}>
@@ -338,12 +338,12 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* DateTimePicker */}
-      {showDatePicker && (
+       {/* Android DateTimePicker */}
+      {Platform.OS !== 'ios' && showDatePicker && (
         <DateTimePicker
           value={editedProfile.birthdate}
           mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display="default"
           onChange={onDateChange}
           maximumDate={new Date()}
           minimumDate={new Date(1900, 0, 1)}
@@ -351,11 +351,12 @@ export default function ProfileScreen() {
         />
       )}
 
+
       {/* iOS DatePicker Modal Wrapper */}
       {Platform.OS === 'ios' && showDatePicker && (
         <Modal
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           visible={showDatePicker}
           onRequestClose={() => setShowDatePicker(false)}
         >
@@ -378,6 +379,7 @@ export default function ProfileScreen() {
                 maximumDate={new Date()}
                 minimumDate={new Date(1900, 0, 1)}
                 themeVariant="light"
+                locale="en-US"
                 style={styles.dateTimePicker}
               />
             </View>
