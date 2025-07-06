@@ -5,7 +5,7 @@ type ActivityLevel =
   | 'very_active'
   | 'super_active';
 
-type FitnessGoal = 'weight_loss' | 'maintenance' | 'weight_gain';
+type FitnessGoal = 'weight_loss' | 'maintenance' | 'muscle_gain';
 
 interface UserInput {
   gender: 'male' | 'female';
@@ -30,8 +30,8 @@ export function calculateTDEEAndMacros(user: UserInput): MacroResult {
   // 1. Calculate BMR
   let BMR =
     gender === 'male'
-      ? (10 * weight) + (6.25 * height) - (5 * age) + 5
-      : (10 * weight) + (6.25 * height) - (5 * age) - 161;
+      ? (13.7 * weight) + (5 * height) - (8 * age) + 66
+      : (9.6 * weight) + (8 * height) - (4.7 * age) + 655;
 
   // 2. Apply activity multiplier
   const activityMultipliers: Record<ActivityLevel, number> = {
@@ -46,18 +46,18 @@ export function calculateTDEEAndMacros(user: UserInput): MacroResult {
 
   // 3. Adjust TDEE based on goal
   let adjustedTdee = TDEE;
-  if (goal === 'weight_loss') adjustedTdee -= 400;
-  else if (goal === 'weight_gain') adjustedTdee += 300;
+  if (goal === 'weight_loss') adjustedTdee -= 200;
+  else if (goal === 'muscle_gain') adjustedTdee += 300;
 
   // 4. Macronutrient distribution
   // Protein per kg
   const proteinPerKg =
-    goal === 'weight_gain' ? 2.2 : goal === 'weight_loss' ? 2.0 : 1.8;
+    goal === 'muscle_gain' ? 2.2 : goal === 'weight_loss' ? 2.0 : 1.8;
   const protein = Math.round(weight * proteinPerKg);
   const proteinKcal = protein * 4;
 
   // Fat percent
-  const fatPercent = goal === 'weight_gain' ? 0.25 : 0.3;
+  const fatPercent = goal === 'muscle_gain' ? 0.25 : 0.3;
   const fatKcal = adjustedTdee * fatPercent;
   const fat = Math.round(fatKcal / 9);
 

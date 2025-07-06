@@ -70,7 +70,7 @@ export default function FitnessLevelForm() {
   };
 
   return (
-    <ScrollView className='p-4 bg-[#84BDEA]'>
+    <ScrollView showsVerticalScrollIndicator={false} className='p-4 bg-[#84BDEA]'>
       <TouchableOpacity className="mb-3" onPress={() => router.back()}>
         <Ionicons name="chevron-back-outline" size={30} color="white" />
       </TouchableOpacity>

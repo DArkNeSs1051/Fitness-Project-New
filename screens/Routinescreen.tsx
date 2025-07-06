@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -17,7 +17,7 @@ import Animated, {
   runOnJS,
   withSpring,
   FadeOutUp,
-  FadeInUp
+  FadeInUp,
 } from "react-native-reanimated";
 import uuid from 'react-native-uuid';
 import AddExerciseModal, { AddExerciseModalRef, Exercise } from "../components/Modal/AddExerciseModal";
@@ -66,12 +66,22 @@ const RoutineScreen = () => {
 
   const currentWorkoutList = useMemo(() => workouts[selectedDate] || [], [selectedDate, workouts]);
 
-  const reorderItems = useCallback((fromIndex: number, toIndex: number) => {
-    if (fromIndex === toIndex) return;
+   const positions = useSharedValue<{ [key: string]: number }>({});
+
+  useEffect(() => {
+    positions.value = Object.assign(
+      {},
+      ...currentWorkoutList.map((item, index) => ({ [item.id]: index }))
+    );
+  }, [currentWorkoutList]);
+
+  const reorderItems = useCallback((fromId: string, toIndex: number) => {
     setWorkouts(prev => {
       const list = [...(prev[selectedDate] || [])];
-      const item = list.splice(fromIndex, 1)[0];
-      list.splice(toIndex, 0, item);
+      const fromIndex = list.findIndex(i => i.id === fromId);
+      if (fromIndex === -1 || fromIndex === toIndex) return prev;
+      const moved = list.splice(fromIndex, 1)[0];
+      list.splice(toIndex, 0, moved);
       return { ...prev, [selectedDate]: list };
     });
   }, [selectedDate]);
@@ -133,49 +143,44 @@ const RoutineScreen = () => {
     }
     setShowFullCalendar(s => !s);
   };
+  
 
-  const DraggableItem = React.memo(({ item, index }: { item: Exercise, index: number }) => {
-    const translateY = useSharedValue(0);
-    const scale = useSharedValue(1);
-    const opacity = useSharedValue(1);
-    const gestureState = useSharedValue('IDLE');
-    const startIdx = useSharedValue(index);
+  const DraggableItem = ({ item }: { item: Exercise }) => {
+    const offsetY = useSharedValue(0);
+    const isDragging = useSharedValue(false);
 
-    React.useEffect(() => {
-      if (gestureState.value === 'IDLE') {
-        translateY.value = 0;
-      }
-    }, [index]);
-
-    const panGesture = Gesture.Pan()
-      .onStart(() => {
-        gestureState.value = 'ACTIVE';
-        startIdx.value = index;
-        runOnJS(setDraggingId)(item.id);
-        scale.value = withSpring(1.05);
-        opacity.value = withTiming(0.8, { duration: 150 });
+    const gesture = Gesture.Pan()
+      .onBegin(() => {
+        isDragging.value = true;
       })
-      .onUpdate(e => { translateY.value = e.translationY; })
-      .onEnd(e => {
-        const delta = Math.round(e.translationY / ITEM_HEIGHT);
-        const newIndex = Math.max(0, Math.min(startIdx.value + delta, currentWorkoutList.length - 1));
-        if (newIndex !== startIdx.value) runOnJS(reorderItems)(startIdx.value, newIndex);
-        scale.value = withSpring(1);
-        opacity.value = withTiming(1, { duration: 150 });
-        gestureState.value = 'IDLE';
-        runOnJS(setDraggingId)(null);
+      .onUpdate(e => {
+        offsetY.value = e.translationY;
       })
-      .enabled(isEditing);
+      .onEnd(() => {
+        const fromIndex = positions.value[item.id];
+        const newIndex = Math.max(0, Math.min(
+          currentWorkoutList.length - 1,
+          Math.floor((fromIndex * ITEM_HEIGHT + offsetY.value) / ITEM_HEIGHT)
+        ));
 
-    const style = useAnimatedStyle(() => ({
-      transform: [{ translateY: translateY.value }, { scale: scale.value }],
-      opacity: opacity.value,
-      zIndex: gestureState.value === 'ACTIVE' ? 10 : 0,
-    }));
+        runOnJS(reorderItems)(item.id, newIndex);
+        offsetY.value = withTiming(0);
+        isDragging.value = false;
+      });
+
+    const animatedStyle = useAnimatedStyle(() => {
+      return {
+        transform: [{ translateY: offsetY.value }],
+        zIndex: isDragging.value ? 10 : 0,
+        opacity: withTiming(isDragging.value ? 0.9 : 1),
+        scale: withTiming(isDragging.value ? 1.05 : 1),
+      };
+    });
+
 
     return (
-      <GestureDetector gesture={panGesture}>
-        <Animated.View style={style} className="flex-row items-center pt-2">
+      <GestureDetector gesture={gesture}>
+        <Animated.View style={animatedStyle} className="flex-row items-center py-2">
           {isEditing && <Ionicons name="menu-outline" size={20} color="white" style={{ marginRight: 8 }} />}
           <Text className="text-white flex-1">{item.exercise}</Text>
           <Text className="text-white flex-1">{item.target}</Text>
@@ -195,7 +200,7 @@ const RoutineScreen = () => {
         </Animated.View>
       </GestureDetector>
     );
-  });
+  };
 
   return (
     <View className="flex-1 pt-4 bg-[#84BDEA]">
@@ -239,7 +244,7 @@ const RoutineScreen = () => {
         </View>
 
         {currentWorkoutList.length > 0 ? (
-          <ScrollView className="bg-[#315D80] rounded-lg p-3 max-h-[60vh]">
+          <View className="bg-[#315D80] rounded-lg p-3 max-h-[60vh]">
             <View className="flex-row items-center pb-2 border-b border-gray-400">
               {isEditing && <View style={{ width: 20 }}/> }
               <Text className="text-white font-bold flex-1">Exercise</Text>
@@ -253,7 +258,7 @@ const RoutineScreen = () => {
             {currentWorkoutList.map((item, idx) => (
               <DraggableItem key={item.id} item={item} index={idx}/>
             ))}
-          </ScrollView>
+          </View>
         ) : (
           <Text className="text-white text-center mt-3 italic">No exercises today. Tap "Edit" to add exercise</Text>
         )}

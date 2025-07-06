@@ -1,8 +1,20 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, KeyboardAvoidingView, Platform } from "react-native";
+import {
+    View,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    StyleSheet,
+    Alert,
+    KeyboardAvoidingView,
+    Platform,
+    TouchableWithoutFeedback,
+    Keyboard
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Constants from 'expo-constants';
+import Constants from "expo-constants";
 import { useRouter } from "expo-router";
+import DropDownPicker from "react-native-dropdown-picker";
 
 export default function generatePlan() {
     const router = useRouter();
@@ -13,14 +25,21 @@ export default function generatePlan() {
         gender: "Male",
         weight: "69",
         height: "165",
-        goal: "Fat loss",
+        goal: "Weight loss",
     };
 
     const [age, setAge] = useState("");
     const [gender, setGender] = useState("");
     const [weight, setWeight] = useState("");
     const [height, setHeight] = useState("");
+
     const [goal, setGoal] = useState("");
+    const [open, setOpen] = useState(false);
+    const [items, setItems] = useState([
+        { label: "Weight loss", value: "weight_loss" },
+        { label: "Muscle gain", value: "muscle_gain" },
+        { label: "Maintenance", value: "maintenance" },
+    ]);
 
     useEffect(() => {
         // Simulate loading data from Firestore
@@ -43,37 +62,74 @@ export default function generatePlan() {
     };
 
     return (
-        <KeyboardAvoidingView
-            style={styles.container}
-            behavior={Platform.OS === "ios" ? "padding" : "height"}
-        >
-            <TouchableOpacity className="ml-5 mt-3" onPress={() => router.back()}>
-                <Ionicons name="chevron-back-outline" size={30} color="white" />
-            </TouchableOpacity>
-            <ScrollView contentContainerStyle={styles.content}>
-                <Text style={styles.title}>Generate Workout Plan</Text>
-
-                <Text style={styles.label}>Age</Text>
-                <TextInput style={styles.input} keyboardType="numeric" value={age} onChangeText={setAge} />
-
-                <Text style={styles.label}>Gender</Text>
-                <TextInput style={styles.input} value={gender} onChangeText={setGender} />
-
-                <Text style={styles.label}>Weight (kg)</Text>
-                <TextInput style={styles.input} keyboardType="numeric" value={weight} onChangeText={setWeight} />
-
-                <Text style={styles.label}>Height (cm)</Text>
-                <TextInput style={styles.input} keyboardType="numeric" value={height} onChangeText={setHeight} />
-
-                <Text style={styles.label}>Goal</Text>
-                <TextInput style={styles.input} value={goal} onChangeText={setGoal} />
-
-                <TouchableOpacity style={styles.button} onPress={handleGenerate}>
-                    <Ionicons name="flash" size={20} color="#fff" />
-                    <Text style={styles.buttonText}>Generate Plan</Text>
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <KeyboardAvoidingView
+                style={styles.container}
+                behavior={Platform.OS === "ios" ? "padding" : "height"}
+            >
+                <TouchableOpacity className="ml-5 mt-3" onPress={() => router.back()}>
+                    <Ionicons name="chevron-back-outline" size={30} color="white" />
                 </TouchableOpacity>
-            </ScrollView>
-        </KeyboardAvoidingView>
+                <View style={styles.content}>
+                    <Text style={styles.title}>Generate Workout Plan</Text>
+
+                    <Text style={styles.label}>Age</Text>
+                    <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={age}
+                        onChangeText={setAge}
+                    />
+
+                    <Text style={styles.label}>Gender</Text>
+                    <View className="flex-row space-x-3 mt-1 mb-1">
+                        {['Male', 'Female'].map((g) => (
+                            <TouchableOpacity className='flex-1 mr-5 ' key={g} onPress={() => setGender(g as any)}>
+                                <Text className={`px-4 py-3 text-center rounded-full ${gender === g ? 'bg-[#3D80C5] text-white' : 'bg-gray-200'}`}>
+                                    {g}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+
+                    <Text style={styles.label}>Weight (kg)</Text>
+                    <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={weight}
+                        onChangeText={setWeight}
+                    />
+
+                    <Text style={styles.label}>Height (cm)</Text>
+                    <TextInput
+                        style={styles.input}
+                        keyboardType="numeric"
+                        value={height}
+                        onChangeText={setHeight}
+                    />
+
+                    <Text style={styles.label}>Goal</Text>
+                    <View style={{ zIndex: 1000 }}>
+                        <DropDownPicker
+                            open={open}
+                            value={goal}
+                            items={items}
+                            setOpen={setOpen}
+                            setValue={setGoal}
+                            setItems={setItems}
+                            style={styles.dropdown}
+                            dropDownContainerStyle={styles.dropdownContainer}
+                            placeholder="Select your goal"
+                        />
+                    </View>
+
+                    <TouchableOpacity style={styles.button} onPress={handleGenerate}>
+                        <Ionicons name="flash" size={20} color="#fff" />
+                        <Text style={styles.buttonText}>Generate Plan</Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
+        </TouchableWithoutFeedback>
     );
 }
 
@@ -84,6 +140,7 @@ const styles = StyleSheet.create({
     },
     content: {
         padding: Constants.statusBarHeight,
+        paddingBottom: 40,
     },
     title: {
         fontSize: 26,
@@ -107,6 +164,15 @@ const styles = StyleSheet.create({
         marginTop: 5,
         borderColor: "#ccc",
         borderWidth: 1,
+    },
+    dropdown: {
+        backgroundColor: "#fff",
+        borderColor: "#ccc",
+        marginTop: 5,
+    },
+    dropdownContainer: {
+        backgroundColor: "#fff",
+        borderColor: "#ccc",
     },
     button: {
         flexDirection: "row",

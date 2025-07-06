@@ -220,7 +220,7 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
                   scrollEventThrottle={16}
                   getItemLayout={getItemLayout}
                   onScroll={handleRepsScroll}
-                  initialScrollIndex={selectedReps}
+                  initialScrollIndex={selectedReps - 1}
                   onScrollToIndexFailed={() => {}}
                   renderItem={({ item, index }) => 
                     renderPickerItem({ item, index, isSelected: item === selectedReps })

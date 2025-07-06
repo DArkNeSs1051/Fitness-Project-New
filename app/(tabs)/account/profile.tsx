@@ -26,7 +26,7 @@ type ProfileData = {
 };
 
 const router = useRouter();
-const genderOptions = ["Male", "Female", "Other", "Prefer not to say"];
+const genderOptions = ["Male", "Female"];
 
 const calculateAge = (birthDate: Date): string => {
   const today = new Date();
@@ -397,7 +397,7 @@ export default function ProfileScreen() {
         <DateTimePicker
           value={editedProfile.birthdate}
           mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
+          display={Platform.OS === "android" ? "default" : "spinner"}
           onChange={onDateChange}
           maximumDate={new Date()}
           minimumDate={new Date(1900, 0, 1)}

@@ -14,9 +14,9 @@ import {
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import Arrow from "../../assets/images/Image/Arrow.svg";
-import MaleIcon from '../../assets/images/Image/Maleicon.svg'
+import MaleIcon from '../../assets/images/Image/Maleicon.svg';
 import MaleIconWhite from "../../assets/images/Image/MaleIconWhite.svg";
-import FemaleIcon from '../../assets/images/Image/Femaleicon.svg'
+import FemaleIcon from '../../assets/images/Image/Femaleicon.svg';
 import FemaleIconWhite from "../../assets/images/Image/FemaleIconWhite.svg";
 import Dumbbell from "../../assets/images/Image/Dumbbell.svg";
 import DumbbellWhite from "../../assets/images/Image/DumbbellWhite.svg";

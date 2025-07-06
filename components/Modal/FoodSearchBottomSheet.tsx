@@ -37,7 +37,7 @@ const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(({ onS
   const bottomSheetRef = useRef<BottomSheetModal>(null);
   const [search, setSearch] = useState('');
   const [selectedFoods, setSelectedFoods] = useState<SelectedFood[]>([]);
-  const snapPoints = useMemo(() => ['70%'], []);
+  const snapPoints = useMemo(() => ['90%'], []);
 
   const filteredFoods = useMemo(() => {
     return sampleFoods.filter((f) =>
