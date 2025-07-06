@@ -10,6 +10,10 @@ import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import TextInputCustom from "~/components/BBComponents/TextInputCustom";
 import GmailiconColor from "../../assets/images/Image/GmailiconColor.svg";
 import { FIRESTORE_DB } from "../../firebaseconfig";
+// import OpenAI from "openai";
+// import { OPENAI_API_KEY } from "@env";
+
+// const client = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
@@ -98,6 +102,26 @@ const SignIn = () => {
       alert(err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
     }
   };
+
+  // useEffect(() => {
+  //   const fetchStory = async () => {
+  //     try {
+  //       const response = await client.chat.completions.create({
+  //         model: "gpt-4o",
+  //         messages: [
+  //           {
+  //             role: "user",
+  //             content: "Write a one-sentence bedtime story about a unicorn.",
+  //           },
+  //         ],
+  //       });
+  //       console.log("Message:", response.choices[0].message.content);
+  //     } catch (error) {
+  //       console.error("❌ Error from OpenAI:", error);
+  //     }
+  //   };
+  //   fetchStory();
+  // }, []);
 
   if (!signInLoaded || !authLoaded) {
     return (

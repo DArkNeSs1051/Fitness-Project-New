@@ -1,5 +1,5 @@
 import { useUser } from "@clerk/clerk-expo";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Platform,
   Text,
@@ -10,25 +10,26 @@ import {
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import Arrow from "../../assets/images/Image/Arrow.svg";
-import MaleIcon from "../../assets/images/Image/MaleIcon.svg";
+import MaleIcon from "../../assets/images/Image/Maleicon.svg";
 import MaleIconWhite from "../../assets/images/Image/MaleIconWhite.svg";
-import FemaleIcon from "../../assets/images/Image/FemaleIcon.svg";
+import FemaleIcon from "../../assets/images/Image/Femaleicon.svg";
 import FemaleIconWhite from "../../assets/images/Image/FemaleIconWhite.svg";
 import Dumbbell from "../../assets/images/Image/Dumbbell.svg";
 import DumbbellWhite from "../../assets/images/Image/DumbbellWhite.svg";
-import FitnessGoal from "../../assets/images/Image/FitnessGoal.svg";
-import GymPreferIcon from "../../assets/images/Image/GymPreferIcon.svg";
+import FitnessGoal from "../../assets/images/Image/Fitnessgoal.svg";
+import GymPreferIcon from "../../assets/images/Image/GymPrefericon.svg";
 import GymPreferIconWhite from "../../assets/images/Image/GymPreferIconWhite.svg";
-import HomePreferIcon from "../../assets/images/Image/HomePreferIcon.svg";
+import HomePreferIcon from "../../assets/images/Image/HomePrefericon.svg";
 import HomePreferIconWhite from "../../assets/images/Image/HomePreferIconWhite.svg";
 import Workout from "../../assets/images/Image/Workout.svg";
-import NutritionIcon from "../../assets/images/Image/NutritionIcon.svg";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import dayjs from "dayjs";
 import { Ionicons } from "@expo/vector-icons";
 import { FIRESTORE_DB } from "~/firebaseconfig";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { router } from "expo-router";
+import OpenAI from "openai";
+import { OPENAI_API_KEY } from "@env";
 
 const classes = {
   title: twMerge("text-3xl font-bold text-[#142939]"),
@@ -57,15 +58,17 @@ interface formInterface {
   level: string;
   goal: string;
   equipment: string;
-  //   tDeeTarget: string;
   activity: string;
   updatedAt: string;
+  workoutDay: number;
 }
+
+const client = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 const Question = () => {
   const { user } = useUser();
   const [states, setStates] = useState(1);
-  const maxStates = 5;
+  const maxStates = 6;
   const [form, setForm] = useState<formInterface>({
     gender: "",
     age: "0",
@@ -75,11 +78,11 @@ const Question = () => {
     height: "",
     heightUnit: "cm",
     level: "beginner",
-    goal: "loseWeight",
-    equipment: "noEquipment",
-    // tDeeTarget: "normal",
+    goal: "lose weight",
+    equipment: "None",
     activity: "sedentary",
     updatedAt: "",
+    workoutDay: 1,
   });
 
   const [errors, setErrors] = useState({
@@ -91,7 +94,12 @@ const Question = () => {
 
   const [showGenderPicker, setShowGenderPicker] = useState(false);
 
-  const onChangeForm = (key: string, value: string) => {
+  const [loading, setLoading] = useState(false);
+  const [userData, setUserData] = useState<any>();
+  const [userId, setUserId] = useState<string>("");
+  const [exercises, setExercises] = useState<any[]>([]);
+
+  const onChangeForm = (key: string, value: string | number) => {
     setForm((prev) => ({ ...prev, [key]: value }));
 
     setErrors((prev) => {
@@ -102,12 +110,12 @@ const Question = () => {
           newErrors.gender = value ? "" : "กรุณาเลือกเพศ";
           break;
         case "weight":
-          newErrors.weight = /^\d+$/.test(value)
+          newErrors.weight = /^\d+$/.test(String(value))
             ? ""
             : "กรุณากรอกน้ำหนักเป็นตัวเลข";
           break;
         case "height":
-          newErrors.height = /^\d+$/.test(value)
+          newErrors.height = /^\d+$/.test(String(value))
             ? ""
             : "กรุณากรอกส่วนสูงเป็นตัวเลข";
           break;
@@ -174,35 +182,192 @@ const Question = () => {
       const userDocSnap = await getDoc(userRef);
 
       if (userDocSnap.exists()) {
+        setLoading(true);
         await setDoc(
           userRef,
           {
-            gender: form.gender,
+            gender: form.gender.toLocaleLowerCase(),
             age: form.age,
             birthday: form.birthday,
             weight: form.weight,
             weightUnit: form.weightUnit,
             height: form.height,
             heightUnit: form.heightUnit,
-            level: form.level,
-            goal: form.goal,
+            level: form.level.toLocaleLowerCase(),
+            goal: form.goal.toLocaleLowerCase(),
             equipment: form.equipment,
-            // tDeeTarget: form.tDeeTarget,
-            activity: form.activity,
+            activity: form.activity.toLocaleLowerCase(),
+            workoutDay: form.workoutDay,
             updatedAt: new Date().toISOString(),
             isFirstLogin: false,
+            isFirstPlan: true,
           },
           { merge: true }
         );
-
-        router.replace("/workout");
       }
     } catch (error) {
       alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
     }
   };
 
-  return (
+  useEffect(() => {
+    const fetchExercises = async () => {
+      try {
+        const exercisesCollectionRef = collection(FIRESTORE_DB, "exercises");
+        const querySnapshot = await getDocs(exercisesCollectionRef);
+        const exercisesData = querySnapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+        }));
+        setExercises(exercisesData);
+      } catch (error) {
+        console.error("❌ Error fetching exercises:", error);
+      }
+    };
+
+    const fetchUserData = async () => {
+      if (!user?.id) return;
+      try {
+        const userRef = doc(FIRESTORE_DB, "users", user.id);
+        const userDocSnap = await getDoc(userRef);
+        setUserId(user.id);
+        if (userDocSnap.exists()) {
+          const data = userDocSnap.data();
+          setUserData(data);
+        }
+      } catch (error) {
+        console.error("❌ Error fetching user data:", error);
+      }
+    };
+
+    fetchExercises();
+    fetchUserData();
+  }, [user, loading]);
+
+  const today = dayjs();
+  const startDate = today.format("YYYY-MM-DD");
+  const endDate = today.add(29, "day").format("YYYY-MM-DD");
+
+  const allowedExercises = exercises.filter((ex) => {
+    if (userData?.equipment === "None") return ex.equipment === "None";
+
+    return true;
+  });
+
+  const fetchWorkoutPlan = async () => {
+    try {
+      const prompt = `
+          You are a professional personal trainer creating a detailed 30-day monthly workout plan for a client.
+
+          🧍‍♂️ User Profile:
+          - Gender: ${userData.gender}
+          - Age: ${userData.age}
+          - Height: ${userData.height}
+          - Weight: ${userData.weight}
+          - Fitness Level: ${userData.level}
+          - Goal: ${userData.goal}
+          - Training Frequency: ${userData.workoutDay} day(s) per week
+          - Equipment Available: ${userData.equipment}
+
+          🏋️‍♀️ Exercises Library:
+          ${JSON.stringify(allowedExercises, null, 2)}
+
+          🔧 Equipment Restrictions:
+          - The client has access to: **${userData.equipment}**
+          ${
+            userData.equipment === "None"
+              ? "- Use only bodyweight exercises. Do not include any exercise that requires equipment."
+              : userData.equipment === "Dumbbell"
+              ? "- Use only exercises that can be done with bodyweight or a dumbbell (no machines or full gym)."
+              : "- The client has access to full gym equipment. You may include bodyweight, dumbbell, barbell, cable, and machine-based exercises."
+          }
+
+          🎯 Objective:
+          Generate a structured 30-day workout plan (from "${startDate}" to "${endDate}") in valid JSON format.
+
+          🛑 STRICT RULES:
+
+          1. The user must **train exactly ${
+            userData.workoutDay
+          } day(s) per week**, totaling ${userData.workoutDay * 4}-${
+        userData.workoutDay * 5
+      } workout days.
+          2. Remaining days must be titled "Rest Day" and contain an empty "exercises" array.
+          3. Spread workout days evenly. Avoid 2 workout days back-to-back unless training 6-7 days/week.
+          4. Each workout day should include at least 3-5 exercises that target a specific group of muscles (e.g. core, upper body, legs).
+          5. Rotate workout types each week.
+          6. Use only allowed equipment as per user profile.
+          7. Avoid repeating same workout routines too often.
+
+          📦 Output Format (JSON only):
+          {
+            "userId": "${userId}",
+            "monthlyWorkoutPlan": [
+              {
+                "day": "2025-07-01",
+                "title": "Full Body Strength",
+                "exercises": [
+                  { "exercise": "Push Up", "sets": "3", "reps": "12", "rest": "60" },
+                  ...
+                ],
+                completed: false
+              },
+              {
+                "day": "2025-07-02",
+                "title": "Rest Day",
+                "exercises": [],
+                completed: false
+              },
+              ...
+            ]
+          }
+
+          📌 VERY IMPORTANT: Return ONLY raw JSON — absolutely NO markdown formatting (no triple backticks or code blocks).
+        `;
+
+      const response = await client.chat.completions.create({
+        model: "gpt-4o",
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      const content = response?.choices?.[0]?.message?.content;
+
+      if (content) {
+        const parsedContent = JSON.parse(content);
+        const userRef = doc(FIRESTORE_DB, "users", parsedContent.userId);
+        await setDoc(
+          userRef,
+          {
+            updatedAt: new Date().toISOString(),
+            routine: parsedContent.monthlyWorkoutPlan,
+            isFirstPlan: false,
+          },
+          { merge: true }
+        );
+      } else {
+        console.warn("⚠️ No content in OpenAI response.");
+      }
+    } catch (error) {
+      console.error("❌ Error from OpenAI:", error);
+    } finally {
+      setLoading(false);
+      router.replace("/workout");
+    }
+  };
+
+  useEffect(() => {
+    if (exercises.length > 0 && userData && userData.isFirstPlan) {
+      fetchWorkoutPlan();
+    }
+  }, [exercises, userData]);
+
+  return loading ? (
+    <View className="flex flex-1 justify-center items-center gap-10 bg-[#84BDEA]">
+      <Text className="text-black animate-pulse text-[20px]">
+        ⏳ กำลังสร้างแผนการออกกำลังกาย
+      </Text>
+    </View>
+  ) : (
     <View className={twMerge("flex-1 gap-5 bg-[#84BDEA]")}>
       <View className="h-[70px] flex flex-row justify-center items-center px-5 relative">
         {states !== 1 && (
@@ -519,14 +684,14 @@ const Question = () => {
                   activeOpacity={1}
                   className={twMerge(
                     classes.boxRounded2,
-                    form.goal === "loseWeight" && "border-[#FDFDFF]"
+                    form.goal === "lose weight" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("goal", "loseWeight")}
+                  onPress={() => onChangeForm("goal", "lose weight")}
                 >
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.goal === "loseWeight" && "text-[#FDFDFF]"
+                      form.goal === "lose weight" && "text-[#FDFDFF]"
                     )}
                   >
                     Lose weight
@@ -534,7 +699,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.goal === "loseWeight" &&
+                      form.goal === "lose weight" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -545,14 +710,14 @@ const Question = () => {
                   activeOpacity={1}
                   className={twMerge(
                     classes.boxRounded2,
-                    form.goal === "gainMuscle" && "border-[#FDFDFF]"
+                    form.goal === "gain muscle" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("goal", "gainMuscle")}
+                  onPress={() => onChangeForm("goal", "gain muscle")}
                 >
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.goal === "gainMuscle" && "text-[#FDFDFF]"
+                      form.goal === "gain muscle" && "text-[#FDFDFF]"
                     )}
                   >
                     Gain Muscle
@@ -560,7 +725,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.goal === "gainMuscle" &&
+                      form.goal === "gain muscle" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -571,14 +736,14 @@ const Question = () => {
                   activeOpacity={1}
                   className={twMerge(
                     classes.boxRounded2,
-                    form.goal === "maintainWeight" && "border-[#FDFDFF]"
+                    form.goal === "maintain weight" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("goal", "maintainWeight")}
+                  onPress={() => onChangeForm("goal", "maintain weight")}
                 >
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.goal === "maintainWeight" && "text-[#FDFDFF]"
+                      form.goal === "maintain weight" && "text-[#FDFDFF]"
                     )}
                   >
                     Maintain Weight
@@ -586,7 +751,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.goal === "maintainWeight" &&
+                      form.goal === "maintain weight" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -615,12 +780,12 @@ const Question = () => {
                   activeOpacity={1}
                   className={twMerge(
                     classes.boxRounded2,
-                    form.equipment === "noEquipment" && "border-[#FDFDFF]"
+                    form.equipment === "None" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("equipment", "noEquipment")}
+                  onPress={() => onChangeForm("equipment", "None")}
                 >
                   <View className="absolute left-5">
-                    {form.equipment === "noEquipment" ? (
+                    {form.equipment === "None" ? (
                       <HomePreferIconWhite />
                     ) : (
                       <HomePreferIcon />
@@ -629,7 +794,7 @@ const Question = () => {
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.equipment === "noEquipment" && "text-[#FDFDFF]"
+                      form.equipment === "None" && "text-[#FDFDFF]"
                     )}
                   >
                     No Equipment
@@ -637,7 +802,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.equipment === "noEquipment" &&
+                      form.equipment === "None" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -648,12 +813,12 @@ const Question = () => {
                   activeOpacity={1}
                   className={twMerge(
                     classes.boxRounded2,
-                    form.equipment === "fullGym" && "border-[#FDFDFF]"
+                    form.equipment === "Full Gym" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("equipment", "fullGym")}
+                  onPress={() => onChangeForm("equipment", "Full Gym")}
                 >
                   <View className="absolute left-5">
-                    {form.equipment === "fullGym" ? (
+                    {form.equipment === "Full Gym" ? (
                       <GymPreferIconWhite />
                     ) : (
                       <GymPreferIcon />
@@ -662,7 +827,7 @@ const Question = () => {
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.equipment === "fullGym" && "text-[#FDFDFF]"
+                      form.equipment === "Full Gym" && "text-[#FDFDFF]"
                     )}
                   >
                     Full Gym
@@ -670,7 +835,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.equipment === "fullGym" &&
+                      form.equipment === "Full Gym" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -681,12 +846,12 @@ const Question = () => {
                   activeOpacity={1}
                   className={twMerge(
                     classes.boxRounded2,
-                    form.equipment === "dumbbell" && "border-[#FDFDFF]"
+                    form.equipment === "Dumbbell" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("equipment", "dumbbell")}
+                  onPress={() => onChangeForm("equipment", "Dumbbell")}
                 >
                   <View className="absolute left-5 w-[32px] h-[32px] items-center justify-center">
-                    {form.equipment === "dumbbell" ? (
+                    {form.equipment === "Dumbbell" ? (
                       <DumbbellWhite />
                     ) : (
                       <Dumbbell />
@@ -695,7 +860,7 @@ const Question = () => {
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.equipment === "dumbbell" && "text-[#FDFDFF]"
+                      form.equipment === "Dumbbell" && "text-[#FDFDFF]"
                     )}
                   >
                     Dumbbell
@@ -703,7 +868,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.equipment === "dumbbell" &&
+                      form.equipment === "Dumbbell" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -713,106 +878,6 @@ const Question = () => {
           </View>
         </View>
       )}
-      {/* States 5 */}
-      {/* {states === 5 && (
-        <View className={classes.container}>
-          <View className="flex flex-col gap-1">
-            <Text className={classes.title}>
-              Which diet method do you prefer ?
-            </Text>
-          </View>
-          <View className="flex items-center justify-center">
-            <NutritionIcon />
-          </View>
-          <View className="flex flex-col gap-5">
-            <Text className={classes.text}>Select the method</Text>
-            <View className="flex flex-col gap-10 items-center justify-center pt-10">
-              <View className="h-[60px]">
-                <TouchableOpacity
-                  activeOpacity={1}
-                  className={twMerge(
-                    classes.boxRounded2,
-                    form.tDeeTarget === "normal" && "border-[#FDFDFF]"
-                  )}
-                  onPress={() => onChangeForm("tDeeTarget", "normal")}
-                >
-                  <Text
-                    className={twMerge(
-                      classes.text,
-                      form.tDeeTarget === "normal" && "text-[#FDFDFF]"
-                    )}
-                  >
-                    Normal
-                  </Text>
-                  <View
-                    className={twMerge(
-                      classes.rounded,
-                      form.tDeeTarget === "normal" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                    )}
-                  ></View>
-                </TouchableOpacity>
-              </View>
-              <View className="h-[60px]">
-                <TouchableOpacity
-                  activeOpacity={1}
-                  className={twMerge(
-                    classes.boxRounded2,
-                    form.tDeeTarget === "intermittentFasting" &&
-                      "border-[#FDFDFF]"
-                  )}
-                  onPress={() =>
-                    onChangeForm("tDeeTarget", "intermittentFasting")
-                  }
-                >
-                  <Text
-                    className={twMerge(
-                      classes.text,
-                      form.tDeeTarget === "intermittentFasting" &&
-                        "text-[#FDFDFF]"
-                    )}
-                  >
-                    Intermittent Fasting
-                  </Text>
-                  <View
-                    className={twMerge(
-                      classes.rounded,
-                      form.tDeeTarget === "intermittentFasting" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                    )}
-                  ></View>
-                </TouchableOpacity>
-              </View>
-              <View className="h-[60px]">
-                <TouchableOpacity
-                  activeOpacity={1}
-                  className={twMerge(
-                    classes.boxRounded2,
-                    form.tDeeTarget === "ketogenic" && "border-[#FDFDFF]"
-                  )}
-                  onPress={() => onChangeForm("tDeeTarget", "ketogenic")}
-                >
-                  <Text
-                    className={twMerge(
-                      classes.text,
-                      form.tDeeTarget === "ketogenic" && "text-[#FDFDFF]"
-                    )}
-                  >
-                    Ketogenic (Keto)
-                  </Text>
-                  <View
-                    className={twMerge(
-                      classes.rounded,
-                      form.tDeeTarget === "ketogenic" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                    )}
-                  ></View>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </View>
-      )} */}
       {/* States 5 */}
       {states === 5 && (
         <View className={classes.container}>
@@ -858,15 +923,15 @@ const Question = () => {
                   className={twMerge(
                     classes.boxRounded2,
                     "text-wrap pr-10 pl-4 w-[300px]",
-                    form.activity === "lightlyActive" && "border-[#FDFDFF]"
+                    form.activity === "lightly active" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("activity", "lightlyActive")}
+                  onPress={() => onChangeForm("activity", "lightly active")}
                 >
                   <Text
                     className={twMerge(
                       classes.text,
 
-                      form.activity === "lightlyActive" && "text-[#FDFDFF]"
+                      form.activity === "lightly active" && "text-[#FDFDFF]"
                     )}
                   >
                     Lightly active (light exercise or sports 1-2 days/week)
@@ -875,7 +940,7 @@ const Question = () => {
                     className={twMerge(
                       classes.rounded,
 
-                      form.activity === "lightlyActive" &&
+                      form.activity === "lightly active" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -887,14 +952,14 @@ const Question = () => {
                   className={twMerge(
                     classes.boxRounded2,
                     "text-wrap pr-10 pl-4 w-[300px]",
-                    form.activity === "moderatelyActive" && "border-[#FDFDFF]"
+                    form.activity === "moderately active" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("activity", "moderatelyActive")}
+                  onPress={() => onChangeForm("activity", "moderately active")}
                 >
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.activity === "moderatelyActive" && "text-[#FDFDFF]"
+                      form.activity === "moderately active" && "text-[#FDFDFF]"
                     )}
                   >
                     Moderately active (moderate exercise or sports 3-5
@@ -903,7 +968,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.activity === "moderatelyActive" &&
+                      form.activity === "moderately active" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -915,14 +980,14 @@ const Question = () => {
                   className={twMerge(
                     classes.boxRounded2,
                     "text-wrap pr-10 pl-4 w-[300px]",
-                    form.activity === "veryActive" && "border-[#FDFDFF]"
+                    form.activity === "very active" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("activity", "veryActive")}
+                  onPress={() => onChangeForm("activity", "very active")}
                 >
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.activity === "veryActive" && "text-[#FDFDFF]"
+                      form.activity === "very active" && "text-[#FDFDFF]"
                     )}
                   >
                     Very active (hard exercise or sports 6-7 days/week)
@@ -930,7 +995,7 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.activity === "veryActive" &&
+                      form.activity === "very active" &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
@@ -942,14 +1007,14 @@ const Question = () => {
                   className={twMerge(
                     classes.boxRounded2,
                     "text-wrap pr-10 pl-4 w-[300px]",
-                    form.activity === "extraActive" && "border-[#FDFDFF]"
+                    form.activity === "extra active" && "border-[#FDFDFF]"
                   )}
-                  onPress={() => onChangeForm("activity", "extraActive")}
+                  onPress={() => onChangeForm("activity", "extra active")}
                 >
                   <Text
                     className={twMerge(
                       classes.text,
-                      form.activity === "extraActive" && "text-[#FDFDFF]"
+                      form.activity === "extra active" && "text-[#FDFDFF]"
                     )}
                   >
                     Extra active (very hard exercise, training twice a day)
@@ -957,7 +1022,184 @@ const Question = () => {
                   <View
                     className={twMerge(
                       classes.rounded,
-                      form.activity === "extraActive" &&
+                      form.activity === "extra active" &&
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                    )}
+                  ></View>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </View>
+      )}
+      {/* States 6 */}
+      {states === 6 && (
+        <View className={classes.container}>
+          <View className="flex flex-col gap-1">
+            <Text className={classes.title}>
+              How many day you want to workout per week?
+            </Text>
+          </View>
+          <View className="flex flex-col gap-5">
+            <Text className={classes.text}>Select the day</Text>
+            <View className="flex flex-col gap-10 items-center justify-center">
+              <View className="h-[60px]">
+                <TouchableOpacity
+                  activeOpacity={1}
+                  className={twMerge(
+                    classes.boxRounded2,
+                    "text-wrap pr-10 pl-4 w-[300px]",
+                    form.workoutDay === 1 && "border-[#FDFDFF]"
+                  )}
+                  onPress={() => onChangeForm("workoutDay", 1)}
+                >
+                  <Text
+                    className={twMerge(
+                      classes.text,
+                      form.workoutDay === 1 && "text-[#FDFDFF]"
+                    )}
+                  >
+                    1
+                  </Text>
+                  <View
+                    className={twMerge(
+                      classes.rounded,
+                      form.workoutDay === 1 &&
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                    )}
+                  ></View>
+                </TouchableOpacity>
+              </View>
+              <View className="h-[60px]">
+                <TouchableOpacity
+                  activeOpacity={1}
+                  className={twMerge(
+                    classes.boxRounded2,
+                    "text-wrap pr-10 pl-4 w-[300px]",
+                    form.workoutDay === 2 && "border-[#FDFDFF]"
+                  )}
+                  onPress={() => onChangeForm("workoutDay", 2)}
+                >
+                  <Text
+                    className={twMerge(
+                      classes.text,
+                      form.workoutDay === 2 && "text-[#FDFDFF]"
+                    )}
+                  >
+                    2
+                  </Text>
+                  <View
+                    className={twMerge(
+                      classes.rounded,
+                      form.workoutDay === 2 &&
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                    )}
+                  ></View>
+                </TouchableOpacity>
+              </View>
+              <View className="h-[60px]">
+                <TouchableOpacity
+                  activeOpacity={1}
+                  className={twMerge(
+                    classes.boxRounded2,
+                    "text-wrap pr-10 pl-4 w-[300px]",
+                    form.workoutDay === 3 && "border-[#FDFDFF]"
+                  )}
+                  onPress={() => onChangeForm("workoutDay", 3)}
+                >
+                  <Text
+                    className={twMerge(
+                      classes.text,
+                      form.workoutDay === 3 && "text-[#FDFDFF]"
+                    )}
+                  >
+                    3
+                  </Text>
+                  <View
+                    className={twMerge(
+                      classes.rounded,
+                      form.workoutDay === 3 &&
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                    )}
+                  ></View>
+                </TouchableOpacity>
+              </View>
+              <View className="h-[60px]">
+                <TouchableOpacity
+                  activeOpacity={1}
+                  className={twMerge(
+                    classes.boxRounded2,
+                    "text-wrap pr-10 pl-4 w-[300px]",
+                    form.workoutDay === 4 && "border-[#FDFDFF]"
+                  )}
+                  onPress={() => onChangeForm("workoutDay", 4)}
+                >
+                  <Text
+                    className={twMerge(
+                      classes.text,
+                      form.workoutDay === 4 && "text-[#FDFDFF]"
+                    )}
+                  >
+                    4
+                  </Text>
+                  <View
+                    className={twMerge(
+                      classes.rounded,
+                      form.workoutDay === 4 &&
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                    )}
+                  ></View>
+                </TouchableOpacity>
+              </View>
+              <View className="h-[60px]">
+                <TouchableOpacity
+                  activeOpacity={1}
+                  className={twMerge(
+                    classes.boxRounded2,
+                    "text-wrap pr-10 pl-4 w-[300px]",
+                    form.workoutDay === 5 && "border-[#FDFDFF]"
+                  )}
+                  onPress={() => onChangeForm("workoutDay", 5)}
+                >
+                  <Text
+                    className={twMerge(
+                      classes.text,
+                      form.workoutDay === 5 && "text-[#FDFDFF]"
+                    )}
+                  >
+                    5
+                  </Text>
+                  <View
+                    className={twMerge(
+                      classes.rounded,
+                      form.workoutDay === 5 &&
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                    )}
+                  ></View>
+                </TouchableOpacity>
+              </View>
+              <View className="h-[60px]">
+                <TouchableOpacity
+                  activeOpacity={1}
+                  className={twMerge(
+                    classes.boxRounded2,
+                    "text-wrap pr-10 pl-4 w-[300px]",
+                    form.workoutDay === 6 && "border-[#FDFDFF]"
+                  )}
+                  onPress={() => onChangeForm("workoutDay", 6)}
+                >
+                  <Text
+                    className={twMerge(
+                      classes.text,
+                      form.workoutDay === 6 && "text-[#FDFDFF]"
+                    )}
+                  >
+                    6
+                  </Text>
+                  <View
+                    className={twMerge(
+                      classes.rounded,
+                      form.workoutDay === 6 &&
                         "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                     )}
                   ></View>
