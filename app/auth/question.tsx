@@ -1,4 +1,11 @@
 import { useUser } from "@clerk/clerk-expo";
+import { OPENAI_API_KEY } from "@env";
+import { Ionicons } from "@expo/vector-icons";
+import DateTimePicker from "@react-native-community/datetimepicker";
+import dayjs from "dayjs";
+import { router } from "expo-router";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import OpenAI from "openai";
 import React, { useEffect, useState } from "react";
 import {
   Platform,
@@ -9,27 +16,20 @@ import {
 } from "react-native";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
+import { FIRESTORE_DB } from "~/firebaseconfig";
 import Arrow from "../../assets/images/Image/Arrow.svg";
-import MaleIcon from "../../assets/images/Image/Maleicon.svg";
-import MaleIconWhite from "../../assets/images/Image/MaleIconWhite.svg";
-import FemaleIcon from "../../assets/images/Image/Femaleicon.svg";
-import FemaleIconWhite from "../../assets/images/Image/FemaleIconWhite.svg";
 import Dumbbell from "../../assets/images/Image/Dumbbell.svg";
 import DumbbellWhite from "../../assets/images/Image/DumbbellWhite.svg";
+import FemaleIcon from "../../assets/images/Image/Femaleicon.svg";
+import FemaleIconWhite from "../../assets/images/Image/FemaleIconWhite.svg";
 import FitnessGoal from "../../assets/images/Image/Fitnessgoal.svg";
 import GymPreferIcon from "../../assets/images/Image/GymPrefericon.svg";
 import GymPreferIconWhite from "../../assets/images/Image/GymPreferIconWhite.svg";
 import HomePreferIcon from "../../assets/images/Image/HomePrefericon.svg";
 import HomePreferIconWhite from "../../assets/images/Image/HomePreferIconWhite.svg";
+import MaleIcon from "../../assets/images/Image/Maleicon.svg";
+import MaleIconWhite from "../../assets/images/Image/MaleIconWhite.svg";
 import Workout from "../../assets/images/Image/Workout.svg";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import dayjs from "dayjs";
-import { Ionicons } from "@expo/vector-icons";
-import { FIRESTORE_DB } from "~/firebaseconfig";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
-import { router } from "expo-router";
-import OpenAI from "openai";
-import { OPENAI_API_KEY } from "@env";
 
 const classes = {
   title: twMerge("text-3xl font-bold text-[#142939]"),
