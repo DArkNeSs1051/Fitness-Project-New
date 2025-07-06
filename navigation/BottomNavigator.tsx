@@ -33,7 +33,6 @@ const BottomNavigator: React.FC = () => {
   ];
 
   return (
-
     <SafeAreaView className="bg-[#84BDEA] items-center pb-4">
       {/* Shadow wrapper */}
       <View style={styles.shadowWrapper}>
@@ -47,9 +46,11 @@ const BottomNavigator: React.FC = () => {
             return (
               <TouchableOpacity
                 key={tab.name}
-                className={`flex-1 items-center py-3 ${isActive ? "bg-[#5FA3D6]" : ""
-                  } ${isFirst ? "rounded-l-[12px]" : ""} ${isLast ? "rounded-r-[12px]" : ""
-                  }`}
+                className={`flex-1 items-center py-3 ${
+                  isActive ? "bg-[#5FA3D6]" : ""
+                } ${isFirst ? "rounded-l-[12px]" : ""} ${
+                  isLast ? "rounded-r-[12px]" : ""
+                }`}
                 onPress={() => handleTabPress(tab.name)}
                 // Optional: Disable the button when already active
                 disabled={isActive}
@@ -62,8 +63,9 @@ const BottomNavigator: React.FC = () => {
                   color={isActive ? "#42779F" : "white"}
                 />
                 <Text
-                  className={`text-xs mt-1 ${isActive ? "text-[#42779F]" : "text-white"
-                    }`}
+                  className={`text-xs mt-1 ${
+                    isActive ? "text-[#42779F]" : "text-white"
+                  }`}
                 >
                   {tab.name}
                 </Text>
@@ -73,7 +75,6 @@ const BottomNavigator: React.FC = () => {
         </View>
       </View>
     </SafeAreaView>
-
   );
 };
 
