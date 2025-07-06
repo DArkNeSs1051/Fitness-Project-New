@@ -6,10 +6,11 @@ interface ButtonProps {
   bgColor?: string;
   icon?: React.ReactNode;
   onClick?: () => void;
+  disabled?: boolean;
 }
 
 const ButtonCustom = (props: ButtonProps) => {
-  const { text, textColor, bgColor, icon, onClick } = props;
+  const { text, textColor, bgColor, icon, onClick, disabled } = props;
 
   return (
     <TouchableOpacity
@@ -20,6 +21,7 @@ const ButtonCustom = (props: ButtonProps) => {
         boxShadow: "0px 1px 3px 0px #00000040",
       }}
       onPress={onClick}
+      disabled={disabled}
     >
       {icon && icon}
       <Text

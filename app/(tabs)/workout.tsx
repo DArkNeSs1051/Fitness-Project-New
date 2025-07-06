@@ -1,8 +1,8 @@
-import { useEffect } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { FIRESTORE_DB } from "../../firebaseconfig";
 import { useUser } from "@clerk/clerk-expo";
 import { router } from "expo-router";
+import { doc, getDoc } from "firebase/firestore";
+import { useEffect } from "react";
+import { FIRESTORE_DB } from "../../firebaseconfig";
 import WorkoutScreen from "../../screens/WorkoutScreen/WorkoutIndexScreen";
 
 export default function Workout() {
@@ -13,6 +13,7 @@ export default function Workout() {
       if (!user?.id) return;
 
       const userRef = doc(FIRESTORE_DB, "users", user.id);
+
       const userDocSnap = await getDoc(userRef);
 
       if (userDocSnap.exists()) {
