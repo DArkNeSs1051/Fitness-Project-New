@@ -2,7 +2,7 @@ import { useUser } from "@clerk/clerk-expo";
 import { router } from "expo-router";
 import { doc, getDoc } from "firebase/firestore";
 import { useEffect } from "react";
-import { FIRESTORE_DB } from "../../firebaseconfig";
+import { FIRESTORE_DB } from "../../firebase";
 import WorkoutScreen from "../../screens/WorkoutScreen/WorkoutIndexScreen";
 
 export default function Workout() {

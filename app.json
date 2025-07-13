@@ -55,7 +55,8 @@
         {
           "experimentalLauncherActivity": true
         }
-      ]
+      ],
+      "@react-native-async-storage/async-storage"
     ],
     "experiments": {
       "typedRoutes": true

@@ -8,7 +8,7 @@ import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import TextInputCustom from "~/components/BBComponents/TextInputCustom";
 import Arrow from "../../assets/images/Image/Arrow.svg";
-import { FIRESTORE_DB } from "../../firebaseconfig";
+import { FIRESTORE_DB } from "../../firebase";
 
 const classes = {
   title: twMerge("text-3xl font-bold text-[#142939]"),

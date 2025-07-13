@@ -3,21 +3,18 @@ import dayjs from "dayjs";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { signInWithCustomToken } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Text, View } from "react-native";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import TextInputCustom from "~/components/BBComponents/TextInputCustom";
 import GmailiconColor from "../../assets/images/Image/GmailiconColor.svg";
-import { FIRESTORE_DB } from "../../firebaseconfig";
-// import OpenAI from "openai";
-// import { OPENAI_API_KEY } from "@env";
-
-// const client = new OpenAI({ apiKey: OPENAI_API_KEY });
+import { FIRESTORE_DB, FIREBASE_AUTH } from "../../firebase"; // Make sure to export FIREBASE_AUTH from your firebase config
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
-  const { userId, isLoaded: authLoaded, isSignedIn } = useAuth();
+  const { userId, isLoaded: authLoaded, isSignedIn, getToken } = useAuth();
   const { user } = useUser();
   const router = useRouter();
   const [form, setForm] = useState({
@@ -37,27 +34,59 @@ const SignIn = () => {
     router.push("/auth/forgotPassword");
   };
 
+  // Sign into Firebase with Clerk token
+  const signIntoFirebaseWithClerk = async () => {
+    try {
+      console.log('🔄 Getting Clerk token...');
+      const token = await getToken({ template: 'integrationfirebase' });
+      
+      if (token) {
+        console.log('✅ Got Clerk token, signing into Firebase...');
+        const userCredentials = await signInWithCustomToken(FIREBASE_AUTH, token);
+        console.log('✅ Successfully signed into Firebase:', userCredentials.user.uid);
+        return userCredentials.user;
+      } else {
+        console.log('❌ No Clerk token received');
+        throw new Error('No Clerk token received');
+      }
+    } catch (error) {
+      console.error('❌ Error signing into Firebase:', error);
+      throw error;
+    }
+  };
+
   useEffect(() => {
     const checkOrCreateUser = async () => {
       if (authLoaded && isSignedIn && userId) {
-        const userRef = doc(FIRESTORE_DB, "users", userId);
-        const userDocSnap = await getDoc(userRef);
+        try {
+          // First, sign into Firebase with Clerk token
+          await signIntoFirebaseWithClerk();
+          
+          // Now Firebase operations will work
+          const userRef = doc(FIRESTORE_DB, "users", userId);
+          const userDocSnap = await getDoc(userRef);
 
-        if (userDocSnap.exists()) {
-          console.log("✅ พบใน Firestore:", userDocSnap.data());
-        } else {
-          console.log("❌ ไม่มีใน Firestore, ทำการสร้างใหม่");
+          if (userDocSnap.exists()) {
+            console.log("✅ พบใน Firestore:", userDocSnap.data());
+          } else {
+            console.log("❌ ไม่มีใน Firestore, ทำการสร้างใหม่");
 
-          await setDoc(userRef, {
-            email: user?.primaryEmailAddress?.emailAddress || "",
-            firstName: user?.firstName || "",
-            lastName: user?.lastName || "",
-            createdAt: dayjs().toISOString(),
-            isFirstLogin: true,
-          });
+            await setDoc(userRef, {
+              email: user?.primaryEmailAddress?.emailAddress || "",
+              firstName: user?.firstName || "",
+              lastName: user?.lastName || "",
+              createdAt: dayjs().toISOString(),
+              isFirstLogin: true,
+            });
+            
+            console.log("✅ สร้างผู้ใช้ใหม่ใน Firestore เรียบร้อย");
+          }
+
+          router.replace("/workout");
+        } catch (error) {
+          console.error("❌ Error in checkOrCreateUser:", error);
+          // Handle error appropriately - maybe show an error message to user
         }
-
-        router.replace("/workout");
       }
     };
 
@@ -75,6 +104,7 @@ const SignIn = () => {
 
       if (signInAttempt.status === "complete") {
         await setActive({ session: signInAttempt.createdSessionId });
+        // The useEffect will handle Firebase sign-in after Clerk sign-in
       } else {
         alert("Sign in failed");
       }
@@ -96,32 +126,13 @@ const SignIn = () => {
           await completeSignIn.setActive({
             session: completeSignIn.createdSessionId,
           });
+          // The useEffect will handle Firebase sign-in after Clerk sign-in
         }
       }
     } catch (err: any) {
       alert(err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
     }
   };
-
-  // useEffect(() => {
-  //   const fetchStory = async () => {
-  //     try {
-  //       const response = await client.chat.completions.create({
-  //         model: "gpt-4o",
-  //         messages: [
-  //           {
-  //             role: "user",
-  //             content: "Write a one-sentence bedtime story about a unicorn.",
-  //           },
-  //         ],
-  //       });
-  //       console.log("Message:", response.choices[0].message.content);
-  //     } catch (error) {
-  //       console.error("❌ Error from OpenAI:", error);
-  //     }
-  //   };
-  //   fetchStory();
-  // }, []);
 
   if (!signInLoaded || !authLoaded) {
     return (
@@ -184,7 +195,7 @@ const SignIn = () => {
       </View>
       <View className="flex flex-col gap-2 w-[250px]">
         <Text className="text-[#000000] text-[12px]">
-          Don’t you have an account ?{" "}
+          Don't you have an account ?{" "}
           <Text onPress={clickToSignUp} className="text-[#42779F] font-bold">
             Sign Up
           </Text>
@@ -196,38 +207,6 @@ const SignIn = () => {
           Forgot your password ?
         </Text>
       </View>
-
-      {/* <Text className="text-3xl font-bold mb-2">เข้าสู่ระบบ</Text>
-
-      <TextInput
-        autoCapitalize="none"
-        value={emailAddress}
-        placeholder="อีเมล"
-        onChangeText={setEmailAddress}
-        className="w-full max-w-xs p-3 rounded-md bg-gray-100 text-base"
-      />
-
-      <TextInput
-        value={password}
-        placeholder="รหัสผ่าน"
-        secureTextEntry
-        onChangeText={setPassword}
-        className="w-full max-w-xs p-3 rounded-md bg-gray-100 text-base"
-      />
-
-      <TouchableOpacity
-        onPress={onSignInPress}
-        className="bg-blue-600 w-full max-w-xs p-3 rounded-lg items-center"
-      >
-        <Text className="text-white text-base font-semibold">เข้าสู่ระบบ</Text>
-      </TouchableOpacity>
-
-      <View className="flex-row gap-2 mt-4">
-        <Text className="text-gray-700">ยังไม่มีบัญชี?</Text>
-        <TouchableOpacity onPress={clickToSignUp}>
-          <Text className="text-blue-600 font-semibold">สมัครใช้งาน</Text>
-        </TouchableOpacity>
-      </View> */}
     </View>
   );
 };
