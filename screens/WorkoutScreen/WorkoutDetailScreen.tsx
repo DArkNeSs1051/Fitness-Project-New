@@ -40,7 +40,7 @@ const WorkoutDetailScreen: React.FC = () => {
     }
 
     return (
-        <View className="flex-1 bg-[#84BDEA] px-2 pt-10">
+        <View className="flex-1 bg-[#84BDEA] px-2 pt-5">
             {/* Header Image */}
             <View className="relative">
                 <Image source={workout.image} className="w-[100%] h-[253] rounded-[12]" />
@@ -54,7 +54,7 @@ const WorkoutDetailScreen: React.FC = () => {
             </View>
 
             {/* Start Button - Positioned to Overlap */}
-            <View className="absolute left-1/2 top-[270] -translate-x-1/2 z-10">
+            <View className="absolute left-1/2 top-[255] -translate-x-1/2 z-10">
                 <TouchableOpacity className="bg-[#84BDEA] px-20 py-3 rounded-[12]" style={shadows.large}>
                     <Text className="text-[#142939] font-bold text-lg">START</Text>
                 </TouchableOpacity>

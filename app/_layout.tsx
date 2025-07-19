@@ -1,5 +1,5 @@
+import 'react-native-reanimated';
 import "~/global.css";
-import "react-native-reanimated";
 import { Stack, usePathname } from "expo-router";
 import BottomNavigator from "../navigation/BottomNavigator";
 import { WorkoutProvider } from "../contexts/WorkoutContext";
@@ -41,7 +41,7 @@ export default function RootLayout() {
                 <Stack.Screen name="(tabs)/routines" />
                 <Stack.Screen name="(tabs)/library" />
                 <Stack.Screen name="(tabs)/workout" />
-                <Stack.Screen name="(tabs)/dietplan" />
+                <Stack.Screen name="(tabs)/nutrition" />
                 <Stack.Screen name="(tabs)/account/index" />
                 <Stack.Screen name="workout/[id]" />
                 <Stack.Screen name="exercise/[id]" />

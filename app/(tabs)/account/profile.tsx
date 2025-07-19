@@ -26,7 +26,7 @@ type ProfileData = {
 };
 
 const router = useRouter();
-const genderOptions = ["Male", "Female", "Other", "Prefer not to say"];
+const genderOptions = ["Male", "Female"];
 
 const calculateAge = (birthDate: Date): string => {
   const today = new Date();
@@ -351,7 +351,7 @@ export default function ProfileScreen() {
       <Modal
         visible={showGenderPicker}
         transparent={true}
-        animationType="slide"
+        animationType="fade"
         onRequestClose={() => setShowGenderPicker(false)}
       >
         <View style={styles.modalOverlay}>
@@ -392,12 +392,12 @@ export default function ProfileScreen() {
         </View>
       </Modal>
 
-      {/* DateTimePicker */}
-      {showDatePicker && (
+       {/* Android DateTimePicker */}
+      {Platform.OS !== 'ios' && showDatePicker && (
         <DateTimePicker
           value={editedProfile.birthdate}
           mode="date"
-          display={Platform.OS === "ios" ? "spinner" : "default"}
+          display={Platform.OS === "android" ? "default" : "spinner"}
           onChange={onDateChange}
           maximumDate={new Date()}
           minimumDate={new Date(1900, 0, 1)}
@@ -405,11 +405,12 @@ export default function ProfileScreen() {
         />
       )}
 
+
       {/* iOS DatePicker Modal Wrapper */}
       {Platform.OS === "ios" && showDatePicker && (
         <Modal
           transparent={true}
-          animationType="slide"
+          animationType="fade"
           visible={showDatePicker}
           onRequestClose={() => setShowDatePicker(false)}
         >
@@ -434,6 +435,7 @@ export default function ProfileScreen() {
                 maximumDate={new Date()}
                 minimumDate={new Date(1900, 0, 1)}
                 themeVariant="light"
+                locale="en-US"
                 style={styles.dateTimePicker}
               />
             </View>

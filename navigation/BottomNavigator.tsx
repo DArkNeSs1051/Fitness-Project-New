@@ -5,8 +5,6 @@ import {
   TouchableOpacity,
   SafeAreaView,
   StyleSheet,
-  KeyboardAvoidingView,
-  Platform,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
@@ -17,8 +15,6 @@ const BottomNavigator: React.FC = () => {
 
   const handleTabPress = (tabName: string) => {
     const targetPath = `/${tabName.toLowerCase()}`;
-
-    // Only navigate if we're not already on that screen
     if (pathname !== targetPath) {
       router.push(targetPath);
     }
@@ -28,15 +24,13 @@ const BottomNavigator: React.FC = () => {
     { name: "Routines", icon: "calendar" },
     { name: "Library", icon: "body" },
     { name: "Workout", icon: "barbell" },
-    { name: "DietPlan", icon: "nutrition" },
+    { name: "Nutrition", icon: "nutrition" },
     { name: "Account", icon: "person" },
   ];
 
   return (
     <SafeAreaView className="bg-[#84BDEA] items-center pb-4">
-      {/* Shadow wrapper */}
       <View style={styles.shadowWrapper}>
-        {/* Inner container with overflow + rounded corners */}
         <View style={styles.tabContainer}>
           {tabs.map((tab, index) => {
             const isActive = pathname === `/${tab.name.toLowerCase()}`;
@@ -52,9 +46,7 @@ const BottomNavigator: React.FC = () => {
                   isLast ? "rounded-r-[12px]" : ""
                 }`}
                 onPress={() => handleTabPress(tab.name)}
-                // Optional: Disable the button when already active
                 disabled={isActive}
-                // Optional: Reduce opacity when disabled
                 style={{ opacity: isActive ? 0.8 : 1 }}
               >
                 <Ionicons
@@ -87,13 +79,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 5,
     elevation: 5,
-    backgroundColor: "transparent", // Prevent gray box on Android
+    backgroundColor: "transparent",
   },
   tabContainer: {
     flexDirection: "row",
     backgroundColor: "#42779F",
     borderRadius: 12,
-    overflow: "hidden", // Needed for rounding
+    overflow: "hidden",
   },
 });
 

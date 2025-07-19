@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
 import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from "expo-router";
 
 const questions = [
   {
@@ -52,6 +53,7 @@ const questions = [
 ];
 
 export default function FitnessLevelForm() {
+  const router = useRouter();
   const [answers, setAnswers] = useState<{ [key: string]: number }>({});
   const [result, setResult] = useState<string | null>(null);
 
@@ -68,9 +70,12 @@ export default function FitnessLevelForm() {
   };
 
   return (
-    <ScrollView contentContainerStyle={{ padding: Constants.statusBarHeight }}>
+    <ScrollView showsVerticalScrollIndicator={false} className='p-4 bg-[#84BDEA]'>
+      <TouchableOpacity className="mb-3" onPress={() => router.back()}>
+        <Ionicons name="chevron-back-outline" size={30} color="white" />
+      </TouchableOpacity>
       {questions.map(q => (
-        <View key={q.key} style={{ marginBottom: 24 }}>
+        <View key={q.key} style={{ paddingHorizontal: 15, marginBottom: 24 }}>
           <Text style={{ fontSize: 16, fontWeight: '600', marginBottom: 12 }}>{q.question}</Text>
           {q.options.map(opt => (
             <TouchableOpacity
@@ -78,12 +83,12 @@ export default function FitnessLevelForm() {
               onPress={() => handleSelect(q.key, opt.value)}
               style={{
                 padding: 12,
-                backgroundColor: answers[q.key] === opt.value ? '#4ade80' : '#e5e7eb',
+                backgroundColor: answers[q.key] === opt.value ? '#142939' : '#FDFDFF',
                 borderRadius: 8,
                 marginBottom: 8,
               }}
             >
-              <Text>{opt.label}</Text>
+              <Text style={{ color: answers[q.key] === opt.value ? '#FDFDFF' : '#142939' }}>{opt.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -92,8 +97,9 @@ export default function FitnessLevelForm() {
       <TouchableOpacity
         onPress={calculateResult}
         style={{
-          backgroundColor: '#3b82f6',
-          padding: 16,
+          backgroundColor: '#42779F',
+          padding: 15,
+          marginHorizontal: 15,
           borderRadius: 10,
           alignItems: 'center',
           marginTop: 10,
