@@ -1,97 +1,66 @@
-const {onCall} = require("firebase-functions/v2/https");
-const {initializeApp} = require("firebase-admin/app");
-const {getFirestore, FieldValue} = require("firebase-admin/firestore");
+const { defineSecret } = require("firebase-functions/params");
+const { onCall } = require("firebase-functions/v2/https");
+const { initializeApp } = require("firebase-admin/app");
+const { getFirestore } = require("firebase-admin/firestore");
 const logger = require("firebase-functions/logger");
-const {OpenAI} = require("openai");
+const { OpenAI } = require("openai");
 const dayjs = require("dayjs");
-const functions = require("firebase-functions");
-const { clerkClient } = require('@clerk/clerk-sdk-node');
+const { clerkClient } = require("@clerk/clerk-sdk-node");
+
+// Define secrets
+const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
+const CLERK_SECRET_KEY = defineSecret("CLERK_SECRET_KEY");
 
 // Initialize Firebase Admin
 initializeApp();
 const db = getFirestore();
 
-// Initialize Clerk with error handling
-let clerk;
-try {
-  const clerkSecretKey = functions.config().clerk?.secret_key;
-  if (!clerkSecretKey) {
-    logger.error("Clerk secret key not configured");
-  } else {
-    clerk = clerkClient({
-      secretKey: clerkSecretKey
-    });
-    logger.info("Clerk initialized successfully");
-  }
-} catch (error) {
-  logger.error("Failed to initialize Clerk:", error);
-}
-
-// Initialize OpenAI with better error handling
-let openai;
-try {
-  const apiKey = functions.config().openai?.api_key;
-  if (!apiKey) {
-    logger.error("OpenAI API key not configured");
-    throw new Error("OpenAI API key not configured");
-  }
-  openai = new OpenAI({
-    apiKey: apiKey
-  });
-  logger.info("OpenAI initialized successfully");
-} catch (error) {
-  logger.error("Failed to initialize OpenAI:", error);
-}
-
-/**
- * Generate Workout Plan using OpenAI
- * No Firebase Auth required - uses Clerk verification instead
- */
-exports.generateWorkoutPlan = onCall({
-  // Remove Firebase Auth requirement
+exports.generateFirebaseCustomToken = onCall({
   enforceAppCheck: false,
+  secrets: [CLERK_SECRET_KEY],
 }, async (request) => {
-  logger.info("generateWorkoutPlan called");
-  logger.info("Request data:", request.data);
-  logger.info("Request auth:", request.auth);
-  
-  const uid = request.data?.userId;
-  if (!uid) {
-    logger.error("No userId provided in request data");
-    throw new Error("Missing userId parameter");
+  logger.info("generateFirebaseCustomToken called");
+
+  const clerkUserId = request.data?.clerkUserId;
+  if (!clerkUserId) {
+    throw new Error("Missing clerkUserId parameter");
   }
+
+  const clerk = clerkClient({ secretKey: CLERK_SECRET_KEY.value() });
 
   try {
-    // Verify user with Clerk (this is your primary auth)
-    if (clerk) {
-      try {
-        const clerkUser = await clerk.users.getUser(uid);
-        if (!clerkUser) {
-          logger.error("Invalid Clerk user:", uid);
-          throw new Error("Invalid user - Clerk verification failed");
-        }
-        logger.info("Clerk user verified:", clerkUser.id);
-      } catch (clerkError) {
-        logger.error("Clerk verification failed:", clerkError);
-        throw new Error("User verification failed: " + clerkError.message);
-      }
-    } else {
-      logger.warn("Clerk not initialized - skipping user verification");
-    }
-    
-    if (!openai) {
-      throw new Error("OpenAI not initialized");
-    }
+    const firebaseCustomToken = await clerk.users.getFirebaseToken(clerkUserId);
+    logger.info("Generated Firebase custom token for Clerk user:", clerkUserId);
+    return { token: firebaseCustomToken };
+  } catch (error) {
+    logger.error("Failed to generate Firebase custom token:", error);
+    throw new Error("Failed to generate Firebase custom token");
+  }
+});
 
-    const userDoc = await db.collection("users").doc(uid).get();
+exports.generateWorkoutPlan = onCall({
+  enforceAppCheck: false,
+  timeoutSeconds: 1000,
+  secrets: [OPENAI_API_KEY],
+}, async (request) => {
+  const firebaseUid = request.auth?.uid;
+  const userId = request.data?.userId || firebaseUid;
+
+  if (!userId) {
+    throw new Error("You must be logged in");
+  }
+
+  const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+
+  try {
+    const userDoc = await db.collection("users").doc(userId).get();
     const userData = userDoc.data();
     if (!userData) {
-      logger.error("User data not found for uid:", uid);
       throw new Error("User data not found");
     }
 
     const exercisesSnapshot = await db.collection("exercises").get();
-    const exercises = exercisesSnapshot.docs.map((doc) => ({id: doc.id, ...doc.data()}));
+    const exercises = exercisesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
 
     const allowedExercises =
       userData.equipment === "None"
@@ -126,7 +95,7 @@ ${
         : userData.equipment === "Dumbbell"
         ? "- Use only exercises that can be done with bodyweight or a dumbbell (no machines or full gym)."
         : "- The client has access to full gym equipment. You may include bodyweight, dumbbell, barbell, cable, and machine-based exercises."
-  }
+    }
 
 🎯 Objective:
 Generate a structured 30-day workout plan (from "${startDate}" to "${endDate}") in valid JSON format.
@@ -137,20 +106,20 @@ Generate a structured 30-day workout plan (from "${startDate}" to "${endDate}") 
     }-${userData.workoutDay * 5} workout days.
 2. Remaining days must be titled "Rest Day" and contain an empty "exercises" array.
 3. Spread workout days evenly. Avoid 2 workout days back-to-back unless training 6-7 days/week.
-4. Each workout day should include at least 3-5 exercises that target a specific group of muscles (e.g. core, upper body, legs).
+4. Each workout day should include 3 to 5 exercises that focus on the same or related muscle group(s), using the "muscleGroups" field from the Exercises Library as the target.
 5. Rotate workout types each week.
 6. Use only allowed equipment as per user profile.
 7. Avoid repeating same workout routines too often.
 
 📦 Output Format (JSON only):
 {
-  "userId": "${uid}",
+  "userId": "${userId}",
   "monthlyWorkoutPlan": [
     {
       "day": "2025-07-01",
       "title": "Full Body Strength",
       "exercises": [
-        { "exercise": "Push Up", "sets": "3", "reps": "12", "rest": "60" }
+        { "id: a short unique string (can be UUID, or "ex1", "ex2", etc.),target: "Chest" exercise": "Push Up", "sets": "3", "reps": "12", "rest": "60" }
       ],
       "completed": false
     },
@@ -168,28 +137,46 @@ Generate a structured 30-day workout plan (from "${startDate}" to "${endDate}") 
 
     const response = await openai.chat.completions.create({
       model: "gpt-4o",
-      messages: [{role: "user", content: prompt}],
+      messages: [{ role: "user", content: prompt }],
     });
 
-    const content = response && response.choices && response.choices[0] && response.choices[0].message && response.choices[0].message.content;
+    const content = response.choices?.[0]?.message?.content;
     if (!content) {
-      logger.error("No response from OpenAI");
       throw new Error("No response from OpenAI");
     }
 
     const parsedContent = JSON.parse(content);
+    const monthlyPlan = parsedContent.monthlyWorkoutPlan;
 
-    await db.collection("users").doc(uid).set(
-      {
-        updatedAt: new Date().toISOString(),
-        routine: parsedContent.monthlyWorkoutPlan,
-        isFirstPlan: false,
-      },
-      {merge: true},
-    );
+    const userRef = db.collection("users").doc(userId);
+    const routinesRef = userRef.collection("routines");
 
-    logger.info("Workout plan generated successfully for uid:", uid);
-    return {success: true, message: "Workout plan generated successfully"};
+    const batch = db.batch();
+
+    // (Optional) Clear previous routine documents
+    const existingDocs = await routinesRef.listDocuments();
+    existingDocs.forEach(doc => batch.delete(doc));
+
+    // Add new routine documents
+    monthlyPlan.forEach(day => {
+    const dayRef = routinesRef.doc(day.day);
+    batch.set(dayRef, {
+      title: day.title || "",
+      completed: day.completed || false,
+      exercises: day.exercises || [],
+    });
+  });
+    // Update user metadata
+    batch.set(userRef, {
+      updatedAt: new Date().toISOString(),
+      isFirstPlan: false,
+    }, { merge: true });
+
+    // Commit everything at once
+    await batch.commit();
+
+    return { success: true, message: "Workout plan generated successfully" };
+
   } catch (err) {
     logger.error("❌ Error generating workout plan", err);
     throw new Error("Failed to generate workout plan: " + err.message);

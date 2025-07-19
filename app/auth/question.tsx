@@ -1,4 +1,6 @@
 import { useUser } from "@clerk/clerk-expo";
+import { getAuth, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
+import { useAuth  } from "@clerk/clerk-expo";
 import { OPENAI_API_KEY } from "@env";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -156,91 +158,116 @@ const Question = () => {
     }
   };
 
-  const fetchWorkoutPlan = async () => {
-  if (!user?.id) {
-    console.log("❌ User not authenticated");
-    alert("Please log in to generate a workout plan");
-    return;
-  }
+  const { getToken } = useAuth();
+const signIntoFirebaseWithClerk = async () => {
+  const token = await getToken({ template: "integration_firebase" });
 
+  if (!token) throw new Error("No Clerk token");
+
+  const auth = getAuth();
+  const userCredential = await signInWithCustomToken(auth, token);
+  console.log("✅ Firebase signInWithCustomToken completed:", userCredential.user.uid);
+
+  // ✅ Wait for Firebase Auth to be fully initialized
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      reject(new Error("Firebase auth state timeout"));
+    }, 5000);
+
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser && firebaseUser.uid === userCredential.user.uid) {
+        clearTimeout(timeout);
+        unsubscribe();
+        console.log("✅ Firebase auth state confirmed:", firebaseUser.uid);
+        resolve(firebaseUser);
+      }
+    });
+  });
+};
+
+const fetchWorkoutPlan = async () => {
   try {
     setLoading(true);
+    
+    // ✅ FIRST: Sign into Firebase and wait for completion
+    await signIntoFirebaseWithClerk();
+    
+    // ✅ SECOND: Double-check auth state
+    const auth = getAuth();
+    console.log("🔥 Firebase currentUser after auth:", auth.currentUser?.uid);
 
-    console.log("✅ Authenticated Clerk user:", user.id);
-    console.log("✅ Calling generateWorkoutPlan function...");
-
-    const generateWorkoutPlan = httpsCallable(functions, "generateWorkoutPlan");
-    const result = await generateWorkoutPlan({ userId: user.id });
-  
-
-    console.log("✅ Function result:", result.data);
-    router.replace("/workout");
-  } catch (error: any) {
-    console.error("❌ Error generating workout plan:", error);
-
-    if (error.code === 'permission-denied') {
-      alert("ไม่มีสิทธิ์เข้าถึง กรุณาลองใหม่อีกครั้ง");
-    } else if (error.code === 'unauthenticated') {
-      alert("กรุณาเข้าสู่ระบบใหม่");
-    } else {
-      alert("เกิดข้อผิดพลาดในการสร้างแผนการออกกำลังกาย");
+    if (!auth.currentUser) {
+      throw new Error("Firebase user not authenticated after sign-in!");
     }
+
+    // ✅ THIRD: Now safe to call the function
+    const generateWorkoutPlan = httpsCallable(functions, "generateWorkoutPlan");
+    const result = await generateWorkoutPlan({
+      // You can pass form data here if needed
+      userData: form
+    });
+
+    console.log("✅ Workout plan result:", result.data);
+    router.replace("/workout");
+    
+  } catch (error) {
+    console.error("❌ Error generating workout plan:", error);
+    alert("เกิดข้อผิดพลาดในการสร้างแผนออกกำลังกาย");
   } finally {
     setLoading(false);
   }
 };
 
-  const upDateUser = async () => {
-    if (!user?.id) {
-      console.log("❌ No user ID available");
-      return;
-    }
+const upDateUser = async () => {
+  if (!user?.id) {
+    console.log("❌ No user ID available");
+    return;
+  }
 
-    try {
-      setLoading(true);
-      console.log("✅ Updating user data...");
+  try {
+    setLoading(true);
+    console.log("✅ Updating user data...");
+    
+    const userRef = doc(FIRESTORE_DB, "users", user.id);
+    const userDocSnap = await getDoc(userRef);
+
+    if (userDocSnap.exists()) {
+      const updatedData = {
+        gender: form.gender.toLocaleLowerCase(),
+        age: form.age,
+        birthday: form.birthday,
+        weight: form.weight,
+        weightUnit: form.weightUnit,
+        height: form.height,
+        heightUnit: form.heightUnit,
+        level: form.level.toLocaleLowerCase(),
+        goal: form.goal.toLocaleLowerCase(),
+        equipment: form.equipment,
+        activity: form.activity.toLocaleLowerCase(),
+        workoutDay: form.workoutDay,
+        updatedAt: new Date().toISOString(),
+        isFirstLogin: false,
+        isFirstPlan: true,
+      };
+
+      await setDoc(userRef, updatedData, { merge: true });
+      console.log("✅ User data updated successfully");
       
-      const userRef = doc(FIRESTORE_DB, "users", user.id);
-      const userDocSnap = await getDoc(userRef);
-
-      if (userDocSnap.exists()) {
-        const updatedData = {
-          gender: form.gender.toLocaleLowerCase(),
-          age: form.age,
-          birthday: form.birthday,
-          weight: form.weight,
-          weightUnit: form.weightUnit,
-          height: form.height,
-          heightUnit: form.heightUnit,
-          level: form.level.toLocaleLowerCase(),
-          goal: form.goal.toLocaleLowerCase(),
-          equipment: form.equipment,
-          activity: form.activity.toLocaleLowerCase(),
-          workoutDay: form.workoutDay,
-          updatedAt: new Date().toISOString(),
-          isFirstLogin: false,
-          isFirstPlan: true,
-        };
-
-        await setDoc(userRef, updatedData, { merge: true });
-        console.log("✅ User data updated successfully");
-        
-        // Wait a moment for Firestore to sync
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        
-        // Then generate workout plan
-        await fetchWorkoutPlan();
-      } else {
-        console.log("❌ User document does not exist");
-        alert("ไม่พบข้อมูลผู้ใช้");
-      }
-    } catch (error) {
-      console.error("❌ Error updating user:", error);
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
-    } finally {
-      setLoading(false);
+      // ✅ Wait a moment for Firestore to sync, then generate workout plan
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      await fetchWorkoutPlan();
+      
+    } else {
+      console.log("❌ User document does not exist");
+      alert("ไม่พบข้อมูลผู้ใช้");
     }
-  };
+  } catch (error) {
+    console.error("❌ Error updating user:", error);
+    alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleNextState = () => {
     if (states === 1) {

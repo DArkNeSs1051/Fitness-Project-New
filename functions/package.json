@@ -16,8 +16,8 @@
   "dependencies": {
     "@clerk/clerk-sdk-node": "^4.13.23",
     "dayjs": "^1.11.13",
-    "firebase-admin": "^12.7.0",
-    "firebase-functions": "^6.0.1",
+    "firebase-admin": "^13.4.0",
+    "firebase-functions": "^6.4.0",
     "openai": "^4.104.0"
   },
   "devDependencies": {
