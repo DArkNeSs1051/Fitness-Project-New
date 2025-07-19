@@ -1,8 +1,18 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Modal, Platform, KeyboardAvoidingView, ScrollView } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  Modal,
+  Platform,
+  KeyboardAvoidingView,
+  ScrollView,
+} from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import DateTimePicker from '@react-native-community/datetimepicker';
+import DateTimePicker from "@react-native-community/datetimepicker";
 import { shadows } from "~/utils/shadow";
 
 type ProfileData = {
@@ -16,26 +26,29 @@ type ProfileData = {
 };
 
 const router = useRouter();
-const genderOptions = ['Male', 'Female', 'Other', 'Prefer not to say'];
+const genderOptions = ["Male", "Female", "Other", "Prefer not to say"];
 
 const calculateAge = (birthDate: Date): string => {
   const today = new Date();
   let age = today.getFullYear() - birthDate.getFullYear();
   const monthDiff = today.getMonth() - birthDate.getMonth();
-  
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+
+  if (
+    monthDiff < 0 ||
+    (monthDiff === 0 && today.getDate() < birthDate.getDate())
+  ) {
     age--;
   }
-  
+
   return age.toString();
 };
 
 const createInitialProfile = (): ProfileData => {
-  const birthdate = new Date(1999, 0, 15); 
+  const birthdate = new Date(1999, 0, 15);
   return {
     name: "Elena",
     birthdate: birthdate,
-    age: calculateAge(birthdate), 
+    age: calculateAge(birthdate),
     gender: "Female",
     email: "Elena@gmail.com",
     username: "Elena1234",
@@ -45,21 +58,24 @@ const createInitialProfile = (): ProfileData => {
 
 export default function ProfileScreen() {
   const [profile, setProfile] = useState(() => createInitialProfile());
-  const [editedProfile, setEditedProfile] = useState(() => createInitialProfile());
+  const [editedProfile, setEditedProfile] = useState(() =>
+    createInitialProfile()
+  );
   const [isEditing, setIsEditing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
 
   useEffect(() => {
-    const changed = Object.keys(profile).some(
-      (key) => {
-        if (key === 'birthdate') {
-          return profile[key].getTime() !== editedProfile[key].getTime();
-        }
-        return profile[key as keyof ProfileData] !== editedProfile[key as keyof ProfileData];
+    const changed = Object.keys(profile).some((key) => {
+      if (key === "birthdate") {
+        return profile[key].getTime() !== editedProfile[key].getTime();
       }
-    );
+      return (
+        profile[key as keyof ProfileData] !==
+        editedProfile[key as keyof ProfileData]
+      );
+    });
     setHasChanges(changed);
   }, [editedProfile, profile]);
 
@@ -68,7 +84,7 @@ export default function ProfileScreen() {
     if (isEditing) {
       const newAge = calculateAge(editedProfile.birthdate);
       if (newAge !== editedProfile.age) {
-        setEditedProfile(prev => ({ ...prev, age: newAge }));
+        setEditedProfile((prev) => ({ ...prev, age: newAge }));
       }
     }
   }, [editedProfile.birthdate, isEditing]);
@@ -78,7 +94,7 @@ export default function ProfileScreen() {
   };
 
   const handleCancel = () => {
-    setEditedProfile({ ...profile }); 
+    setEditedProfile({ ...profile });
     setIsEditing(false);
     setHasChanges(false);
   };
@@ -87,7 +103,7 @@ export default function ProfileScreen() {
     // Update age one final time before saving
     const finalProfile = {
       ...editedProfile,
-      age: calculateAge(editedProfile.birthdate)
+      age: calculateAge(editedProfile.birthdate),
     };
     setProfile(finalProfile);
     setEditedProfile(finalProfile);
@@ -98,27 +114,27 @@ export default function ProfileScreen() {
   // Modified edit toggle function to handle reverting changes
   const handleEditToggle = () => {
     if (isEditing) {
-      setEditedProfile({ ...profile }); 
+      setEditedProfile({ ...profile });
       setHasChanges(false);
     }
     setIsEditing((prev) => !prev);
   };
 
   const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
+    return date.toLocaleDateString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "numeric",
     });
   };
 
   const onDateChange = (event: any, selectedDate?: Date) => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       setShowDatePicker(false);
     }
-    
+
     if (selectedDate) {
-      handleChange('birthdate', selectedDate);
+      handleChange("birthdate", selectedDate);
     }
   };
 
@@ -129,26 +145,34 @@ export default function ProfileScreen() {
   };
 
   return (
-    <KeyboardAvoidingView 
+    <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <ScrollView 
+      <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
         {/* Header */}
-        <View className="bg-[#42779F] rounded-[12] flex-1" style={shadows.large}>
+        <View
+          className="bg-[#42779F] rounded-[12] flex-1"
+          style={shadows.large}
+        >
           <View style={styles.header}>
             <TouchableOpacity onPress={() => router.back()}>
               <Ionicons name="chevron-back-outline" size={30} color="white" />
             </TouchableOpacity>
             <View className="flex-column items-center ">
-              <View className='bg-[#356182] rounded-[10] ml-10'>
-                <Ionicons className='m-2' name="person-outline" size={24} color="#FFFFFF" />
+              <View className="bg-[#356182] rounded-[10] ml-10">
+                <Ionicons
+                  className="m-2"
+                  name="person-outline"
+                  size={24}
+                  color="#FFFFFF"
+                />
               </View>
               <Text style={styles.title}>About you</Text>
             </View>
@@ -164,7 +188,13 @@ export default function ProfileScreen() {
                 size={20}
                 color={isEditing ? "#42779F" : "#73b5e8"}
               />
-              <Text className="font-bold" style={{ color: isEditing ? "#42779F" : "#73b5e8", marginLeft: 5 }}>
+              <Text
+                className="font-bold"
+                style={{
+                  color: isEditing ? "#42779F" : "#73b5e8",
+                  marginLeft: 5,
+                }}
+              >
                 {isEditing ? "Done" : "Edit"}
               </Text>
             </TouchableOpacity>
@@ -180,7 +210,7 @@ export default function ProfileScreen() {
                   style={styles.input}
                   editable={isEditing}
                   value={editedProfile.name}
-                  onChangeText={(text) => handleChange('name', text)}
+                  onChangeText={(text) => handleChange("name", text)}
                   returnKeyType="next"
                 />
               </View>
@@ -193,11 +223,20 @@ export default function ProfileScreen() {
                   onPress={handleDatePickerPress}
                   disabled={!isEditing}
                 >
-                  <Text style={[styles.inputText, !isEditing && styles.disabledText]}>
+                  <Text
+                    style={[
+                      styles.inputText,
+                      !isEditing && styles.disabledText,
+                    ]}
+                  >
                     {formatDate(editedProfile.birthdate)}
                   </Text>
                   {isEditing && (
-                    <Ionicons name="calendar-outline" size={20} color="#98c9ee" />
+                    <Ionicons
+                      name="calendar-outline"
+                      size={20}
+                      color="#98c9ee"
+                    />
                   )}
                 </TouchableOpacity>
               </View>
@@ -220,11 +259,20 @@ export default function ProfileScreen() {
                   onPress={() => isEditing && setShowGenderPicker(true)}
                   disabled={!isEditing}
                 >
-                  <Text style={[styles.inputText, !isEditing && styles.disabledText]}>
+                  <Text
+                    style={[
+                      styles.inputText,
+                      !isEditing && styles.disabledText,
+                    ]}
+                  >
                     {editedProfile.gender}
                   </Text>
                   {isEditing && (
-                    <Ionicons name="chevron-down-outline" size={20} color="#98c9ee" />
+                    <Ionicons
+                      name="chevron-down-outline"
+                      size={20}
+                      color="#98c9ee"
+                    />
                   )}
                 </TouchableOpacity>
               </View>
@@ -240,7 +288,7 @@ export default function ProfileScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="next"
-                  onChangeText={(text) => handleChange('email', text)}
+                  onChangeText={(text) => handleChange("email", text)}
                 />
               </View>
 
@@ -254,7 +302,7 @@ export default function ProfileScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="next"
-                  onChangeText={(text) => handleChange('username', text)}
+                  onChangeText={(text) => handleChange("username", text)}
                 />
               </View>
 
@@ -269,7 +317,7 @@ export default function ProfileScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   returnKeyType="done"
-                  onChangeText={(text) => handleChange('password', text)}
+                  onChangeText={(text) => handleChange("password", text)}
                 />
               </View>
             </View>
@@ -278,7 +326,10 @@ export default function ProfileScreen() {
           {/* Buttons */}
           {isEditing && (
             <View style={styles.buttonRow}>
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+              >
                 <Text style={{ color: "#333" }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
@@ -316,17 +367,20 @@ export default function ProfileScreen() {
                 key={option}
                 style={[
                   styles.genderOption,
-                  editedProfile.gender === option && styles.selectedOption
+                  editedProfile.gender === option && styles.selectedOption,
                 ]}
                 onPress={() => {
-                  handleChange('gender', option);
+                  handleChange("gender", option);
                   setShowGenderPicker(false);
                 }}
               >
-                <Text style={[
-                  styles.genderOptionText,
-                  editedProfile.gender === option && styles.selectedOptionText
-                ]}>
+                <Text
+                  style={[
+                    styles.genderOptionText,
+                    editedProfile.gender === option &&
+                      styles.selectedOptionText,
+                  ]}
+                >
                   {option}
                 </Text>
                 {editedProfile.gender === option && (
@@ -343,7 +397,7 @@ export default function ProfileScreen() {
         <DateTimePicker
           value={editedProfile.birthdate}
           mode="date"
-          display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+          display={Platform.OS === "ios" ? "spinner" : "default"}
           onChange={onDateChange}
           maximumDate={new Date()}
           minimumDate={new Date(1900, 0, 1)}
@@ -352,7 +406,7 @@ export default function ProfileScreen() {
       )}
 
       {/* iOS DatePicker Modal Wrapper */}
-      {Platform.OS === 'ios' && showDatePicker && (
+      {Platform.OS === "ios" && showDatePicker && (
         <Modal
           transparent={true}
           animationType="slide"
@@ -367,7 +421,9 @@ export default function ProfileScreen() {
                 </TouchableOpacity>
                 <Text style={styles.modalTitle}>Select Birthdate</Text>
                 <TouchableOpacity onPress={() => setShowDatePicker(false)}>
-                  <Text style={[styles.modalButtonText, styles.doneButton]}>Done</Text>
+                  <Text style={[styles.modalButtonText, styles.doneButton]}>
+                    Done
+                  </Text>
                 </TouchableOpacity>
               </View>
               <DateTimePicker
@@ -409,7 +465,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
     paddingBottom: 10,
     borderBottomColor: "#84BDEA",
-    borderBottomWidth: 2
+    borderBottomWidth: 2,
   },
   title: {
     fontSize: 20,
@@ -417,7 +473,7 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     textAlign: "center",
     marginLeft: 30,
-    marginTop: 10
+    marginTop: 10,
   },
   editButton: {
     flexDirection: "row",
@@ -427,7 +483,7 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     width: 70,
     justifyContent: "center",
-    marginRight: 10
+    marginRight: 10,
   },
   informationWrapper: {
     backgroundColor: "#2c4963",
