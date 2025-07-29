@@ -17,7 +17,7 @@ const ExerciseDetail = () => {
 
   const [exercise, setExercise] = useState(null);
 
-  // Get exercises array and fetchExercises function from store
+  // Get exercises from store
   const exercises = useExerciseStore((state) => state.exercises);
   const fetchExercises = useExerciseStore((state) => state.fetchExercises);
 

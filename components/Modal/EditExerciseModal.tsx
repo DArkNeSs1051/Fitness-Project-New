@@ -12,7 +12,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Platform,
 } from 'react-native';
 import { FlatList } from 'react-native-gesture-handler';
@@ -22,15 +21,13 @@ import {
   BottomSheetBackdrop,
 } from '@gorhom/bottom-sheet';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
-
 export type EditExercise = {
   id: string;
   exercise: string;
   target: string;
-  reps: number;
+  reps: number | string; 
   sets: number;
-  rest: string; // format: MM:SS
+  rest: string; 
 };
 
 export type EditExerciseModalRef = {
@@ -46,6 +43,32 @@ const ITEM_HEIGHT = 40;
 const VISIBLE_ITEMS = 3;
 const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 
+// function to check if an exercise uses time format (like plank)
+const isTimeBasedExercise = (exerciseName: string): boolean => {
+  const timeBasedExercises = ['plank', 'wall sit', 'hold', 'static'];
+  return timeBasedExercises.some(keyword => 
+    exerciseName.toLowerCase().includes(keyword)
+  );
+};
+
+// function to parse time string (MM:SS) to total seconds
+const parseTimeToSeconds = (timeStr: string): { minutes: number; seconds: number } => {
+  if (typeof timeStr !== 'string' || !timeStr.includes(':')) {
+    return { minutes: 0, seconds: 0 };
+  }
+  
+  const [minStr, secStr] = timeStr.split(':');
+  const minutes = Math.max(0, Math.min(parseInt(minStr) || 0, 10));
+  const seconds = Math.max(0, Math.min(parseInt(secStr) || 0, 59));
+  
+  return { minutes, seconds };
+};
+
+// function to format time from minutes and seconds
+const formatTime = (minutes: number, seconds: number): string => {
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
+
 const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
   ({ onSave }, ref) => {
     const bottomSheetModalRef = useRef<BottomSheetModal>(null);
@@ -53,36 +76,55 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
     const setsListRef = useRef<FlatList>(null);
     const minutesListRef = useRef<FlatList>(null);
     const secondsListRef = useRef<FlatList>(null);
+    const timeMinutesListRef = useRef<FlatList>(null);
+    const timeSecondsListRef = useRef<FlatList>(null);
     
     const [exercise, setExercise] = useState<EditExercise | null>(null);
     const [isModalVisible, setIsModalVisible] = useState(false);
+    const [isTimeBased, setIsTimeBased] = useState(false);
 
-    // Arrays - Updated sets array to show 1-10 instead of 0-10
+    // Arrays
     const repsArray = useMemo(() => Array.from({ length: 31 }, (_, i) => i+1), []);
     const setsArray = useMemo(() => Array.from({ length: 10 }, (_, i) => i + 1), []);
     const minutesArray = useMemo(() => Array.from({ length: 11 }, (_, i) => i), []);
     const secondsArray = useMemo(() => Array.from({ length: 12 }, (_, i) => i * 5), []);
+    
+    // Time-based arrays for exercises like plank
+    const timeMinutesArray = useMemo(() => Array.from({ length: 11 }, (_, i) => i), []); // 0-10 minutes
+    const timeSecondsArray = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []); // 0-59 seconds
 
     const [selectedReps, setSelectedReps] = useState(1);
-    const [selectedSets, setSelectedSets] = useState(1); // Default to 1 instead of 0
+    const [selectedSets, setSelectedSets] = useState(1);
     const [selectedMinute, setSelectedMinute] = useState(0);
     const [selectedSecond, setSelectedSecond] = useState(0);
+    
+    // Time-based states
+    const [selectedTimeMinute, setSelectedTimeMinute] = useState(0);
+    const [selectedTimeSecond, setSelectedTimeSecond] = useState(30);
 
     const snapPoints = useMemo(() => ['65%'], []);
 
-    // Auto-scroll to initial positions when modal becomes visible
     useEffect(() => {
       if (isModalVisible && exercise) {
         const timer = setTimeout(() => {
-          // Calculate offset for centering the selected item
-          const repsOffset = (selectedReps - 1) * ITEM_HEIGHT;
-          // Updated calculation for sets offset since array now starts from 1
+          if (isTimeBased) {
+            // Scroll time pickers
+            const timeMinutesOffset = selectedTimeMinute * ITEM_HEIGHT;
+            const timeSecondsOffset = selectedTimeSecond * ITEM_HEIGHT;
+            timeMinutesListRef.current?.scrollToOffset({ offset: timeMinutesOffset, animated: false });
+            timeSecondsListRef.current?.scrollToOffset({ offset: timeSecondsOffset, animated: false });
+          } else {
+            // Scroll reps picker
+            const repsOffset = (selectedReps - 1) * ITEM_HEIGHT;
+            repsListRef.current?.scrollToOffset({ offset: repsOffset, animated: false });
+          }
+          
+          // Always scroll sets and rest time pickers
           const setsOffset = (selectedSets - 1) * ITEM_HEIGHT;
           const minutesOffset = selectedMinute * ITEM_HEIGHT;
           const secondsIndex = secondsArray.indexOf(selectedSecond);
           const secondsOffset = secondsIndex >= 0 ? secondsIndex * ITEM_HEIGHT : 0;
 
-          repsListRef.current?.scrollToOffset({ offset: repsOffset, animated: false });
           setsListRef.current?.scrollToOffset({ offset: setsOffset, animated: false });
           minutesListRef.current?.scrollToOffset({ offset: minutesOffset, animated: false });
           secondsListRef.current?.scrollToOffset({ offset: secondsOffset, animated: false });
@@ -90,7 +132,7 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
         
         return () => clearTimeout(timer);
       }
-    }, [isModalVisible, exercise, selectedReps, selectedSets, selectedMinute, selectedSecond, secondsArray]);
+    }, [isModalVisible, exercise, selectedReps, selectedSets, selectedMinute, selectedSecond, selectedTimeMinute, selectedTimeSecond, secondsArray, isTimeBased]);
 
     useImperativeHandle(ref, () => ({
       present: (ex) => {
@@ -99,12 +141,24 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
         const sec = parseInt(secStr) || 0;
         const validSecond = secondsArray.includes(sec) ? sec : 0;
 
+        const timeBasedExercise = isTimeBasedExercise(ex.exercise);
+        setIsTimeBased(timeBasedExercise);
+
         setExercise(ex);
-        setSelectedReps(Math.min(Math.max(ex.reps,1), 30));
-        // Updated to clamp sets between 1-10 instead of 0-10
         setSelectedSets(Math.min(Math.max(ex.sets, 1), 10));
         setSelectedMinute(min);
         setSelectedSecond(validSecond);
+        
+        if (timeBasedExercise) {
+          // Parse reps as time format
+          const { minutes, seconds } = parseTimeToSeconds(String(ex.reps));
+          setSelectedTimeMinute(minutes);
+          setSelectedTimeSecond(seconds);
+        } else {
+          // Parse reps as number
+          const repsValue = typeof ex.reps === 'number' ? ex.reps : parseInt(String(ex.reps)) || 1;
+          setSelectedReps(Math.min(Math.max(repsValue, 1), 30));
+        }
         
         bottomSheetModalRef.current?.present();
       },
@@ -119,9 +173,13 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
           selectedSecond
         ).padStart(2, '0')}`;
 
+        const repsValue = isTimeBased 
+          ? formatTime(selectedTimeMinute, selectedTimeSecond)
+          : selectedReps;
+
         const updated = {
           ...exercise,
-          reps: selectedReps,
+          reps: repsValue,
           sets: selectedSets,
           rest: formattedRest,
         };
@@ -138,7 +196,7 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
       }
     }, []);
 
-    // Scroll handlers with smoother tracking
+    // Scroll handlers
     const handleRepsScroll = useCallback((event: any) => {
       const y = event.nativeEvent.contentOffset.y;
       const index = Math.round(y / ITEM_HEIGHT);
@@ -170,6 +228,21 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
       setSelectedSecond(secondsArray[clampedIndex]);
     }, [secondsArray]);
 
+    // Time-based scroll handlers
+    const handleTimeMinutesScroll = useCallback((event: any) => {
+      const y = event.nativeEvent.contentOffset.y;
+      const index = Math.round(y / ITEM_HEIGHT);
+      const clampedIndex = Math.min(Math.max(index, 0), timeMinutesArray.length - 1);
+      setSelectedTimeMinute(timeMinutesArray[clampedIndex]);
+    }, [timeMinutesArray]);
+
+    const handleTimeSecondsScroll = useCallback((event: any) => {
+      const y = event.nativeEvent.contentOffset.y;
+      const index = Math.round(y / ITEM_HEIGHT);
+      const clampedIndex = Math.min(Math.max(index, 0), timeSecondsArray.length - 1);
+      setSelectedTimeSecond(timeSecondsArray[clampedIndex]);
+    }, [timeSecondsArray]);
+
     const renderPickerItem = useCallback(({ item, index, isSelected }: { item: number, index: number, isSelected: boolean }) => (
       <View style={[styles.pickerItem, isSelected && styles.selectedPickerItem]}>
         <Text style={[styles.pickerText, isSelected && styles.selectedText]}>
@@ -198,35 +271,87 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
         <BottomSheetView style={styles.container}>
           <Text style={styles.title}>Edit Exercise</Text>
 
-          {/* Reps and Sets Container */}
           <View style={styles.containerRepSet}>
-            {/* Reps Picker */}
             <View style={styles.flexRepSet}>
-              <Text style={styles.label}>Reps</Text>
-              <View style={styles.pickerWrapper}>
-                {/* Selection Indicator */}
-                <View style={styles.selectionIndicator} />
-                <FlatList
-                  ref={repsListRef}
-                  data={repsArray}
-                  keyExtractor={(item, index) => `reps-${item}-${index}`}
-                  showsVerticalScrollIndicator={false}
-                  snapToInterval={ITEM_HEIGHT}
-                  snapToAlignment="center"
-                  decelerationRate="fast"
-                  bounces={false}
-                  nestedScrollEnabled={true}
-                  contentContainerStyle={styles.pickerList}
-                  scrollEventThrottle={16}
-                  getItemLayout={getItemLayout}
-                  onScroll={handleRepsScroll}
-                  initialScrollIndex={selectedReps - 1}
-                  onScrollToIndexFailed={() => {}}
-                  renderItem={({ item, index }) => 
-                    renderPickerItem({ item, index, isSelected: item === selectedReps })
-                  }
-                />
-              </View>
+              <Text style={styles.label}>{isTimeBased ? 'Duration (MM:SS)' : 'Reps'}</Text>
+              {isTimeBased ? (
+                <View style={styles.timePickerContainer}>
+                  <View style={styles.pickerWrapper}>
+                    <View style={styles.selectionIndicator} />
+                    <FlatList
+                      ref={timeMinutesListRef}
+                      data={timeMinutesArray}
+                      keyExtractor={(item, index) => `time-minutes-${item}-${index}`}
+                      showsVerticalScrollIndicator={false}
+                      snapToInterval={ITEM_HEIGHT}
+                      snapToAlignment="center"
+                      decelerationRate="fast"
+                      bounces={false}
+                      nestedScrollEnabled={true}
+                      contentContainerStyle={styles.pickerList}
+                      scrollEventThrottle={16}
+                      getItemLayout={getItemLayout}
+                      onScroll={handleTimeMinutesScroll}
+                      initialScrollIndex={selectedTimeMinute}
+                      onScrollToIndexFailed={() => {}}
+                      renderItem={({ item, index }) => 
+                        renderPickerItem({ item, index, isSelected: item === selectedTimeMinute })
+                      }
+                    />
+                  </View>
+                  
+                  <Text style={styles.timeColon}>:</Text>
+                  
+                  <View style={styles.pickerWrapper}>
+                    <View style={styles.selectionIndicator} />
+                    <FlatList
+                      ref={timeSecondsListRef}
+                      data={timeSecondsArray}
+                      keyExtractor={(item, index) => `time-seconds-${item}-${index}`}
+                      showsVerticalScrollIndicator={false}
+                      snapToInterval={ITEM_HEIGHT}
+                      snapToAlignment="center"
+                      decelerationRate="fast"
+                      bounces={false}
+                      nestedScrollEnabled={true}
+                      contentContainerStyle={styles.pickerList}
+                      scrollEventThrottle={16}
+                      getItemLayout={getItemLayout}
+                      onScroll={handleTimeSecondsScroll}
+                      initialScrollIndex={selectedTimeSecond}
+                      onScrollToIndexFailed={() => {}}
+                      renderItem={({ item, index }) => 
+                        renderPickerItem({ item, index, isSelected: item === selectedTimeSecond })
+                      }
+                    />
+                  </View>
+                </View>
+              ) : (
+                // Regular reps picker
+                <View style={styles.pickerWrapper}>
+                  <View style={styles.selectionIndicator} />
+                  <FlatList
+                    ref={repsListRef}
+                    data={repsArray}
+                    keyExtractor={(item, index) => `reps-${item}-${index}`}
+                    showsVerticalScrollIndicator={false}
+                    snapToInterval={ITEM_HEIGHT}
+                    snapToAlignment="center"
+                    decelerationRate="fast"
+                    bounces={false}
+                    nestedScrollEnabled={true}
+                    contentContainerStyle={styles.pickerList}
+                    scrollEventThrottle={16}
+                    getItemLayout={getItemLayout}
+                    onScroll={handleRepsScroll}
+                    initialScrollIndex={selectedReps - 1}
+                    onScrollToIndexFailed={() => {}}
+                    renderItem={({ item, index }) => 
+                      renderPickerItem({ item, index, isSelected: item === selectedReps })
+                    }
+                  />
+                </View>
+              )}
             </View>
 
             {/* Sets Picker */}
@@ -248,7 +373,7 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
                   scrollEventThrottle={16}
                   getItemLayout={getItemLayout}
                   onScroll={handleSetsScroll}
-                  initialScrollIndex={selectedSets - 1} // Adjusted for 1-based indexing
+                  initialScrollIndex={selectedSets - 1}
                   onScrollToIndexFailed={() => {}}
                   renderItem={({ item, index }) => 
                     renderPickerItem({ item, index, isSelected: item === selectedSets })
@@ -331,7 +456,7 @@ const styles = StyleSheet.create({
   containerRepSet: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginHorizontal: 50,
+    marginHorizontal: 30,
     marginBottom: 20,
   },
   flexRepSet: {
@@ -361,6 +486,19 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     overflow: 'hidden',
   },
+  timePickerContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timeColon: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    marginHorizontal: 8,
+    color: '#5FA3D6',
+    alignSelf: 'center',
+    marginTop: 20, // Adjust to align with picker items
+  },
   selectionIndicator: {
     position: 'absolute',
     top: ITEM_HEIGHT,
@@ -373,7 +511,7 @@ const styles = StyleSheet.create({
     pointerEvents: 'none',
   },
   pickerList: {
-    paddingVertical: ITEM_HEIGHT, // This centers the middle item
+    paddingVertical: ITEM_HEIGHT,
   },
   pickerItem: {
     height: ITEM_HEIGHT,

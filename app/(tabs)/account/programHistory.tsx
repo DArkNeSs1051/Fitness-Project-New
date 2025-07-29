@@ -5,7 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Card } from '../../../components/ui/card';
 import { shadows } from '~/utils/shadow';
-import { ProgressSection } from '~/components/ProgressSection';
+
 
 // Define workout type
 interface WorkoutDay {
@@ -13,11 +13,9 @@ interface WorkoutDay {
     title: string;
     day: string;
     targetMuscles: string;
-    image: any; // In a real app, you would use proper typing
+    image: any;
 }
 
-const { height } = Dimensions.get("window");
-const ITEM_HEIGHT = 35;
 const programHistoryIndex: React.FC = () => {
     // Sample workout data
     const workouts: WorkoutDay[] = [

@@ -5,38 +5,13 @@ const { getFirestore } = require("firebase-admin/firestore");
 const logger = require("firebase-functions/logger");
 const { OpenAI } = require("openai");
 const dayjs = require("dayjs");
-const { clerkClient } = require("@clerk/clerk-sdk-node");
 
 // Define secrets
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
-const CLERK_SECRET_KEY = defineSecret("CLERK_SECRET_KEY");
 
 // Initialize Firebase Admin
 initializeApp();
 const db = getFirestore();
-
-exports.generateFirebaseCustomToken = onCall({
-  enforceAppCheck: false,
-  secrets: [CLERK_SECRET_KEY],
-}, async (request) => {
-  logger.info("generateFirebaseCustomToken called");
-
-  const clerkUserId = request.data?.clerkUserId;
-  if (!clerkUserId) {
-    throw new Error("Missing clerkUserId parameter");
-  }
-
-  const clerk = clerkClient({ secretKey: CLERK_SECRET_KEY.value() });
-
-  try {
-    const firebaseCustomToken = await clerk.users.getFirebaseToken(clerkUserId);
-    logger.info("Generated Firebase custom token for Clerk user:", clerkUserId);
-    return { token: firebaseCustomToken };
-  } catch (error) {
-    logger.error("Failed to generate Firebase custom token:", error);
-    throw new Error("Failed to generate Firebase custom token");
-  }
-});
 
 exports.generateWorkoutPlan = onCall({
   enforceAppCheck: false,
@@ -110,6 +85,11 @@ Generate a structured 30-day workout plan (from "${startDate}" to "${endDate}") 
 5. Rotate workout types each week.
 6. Use only allowed equipment as per user profile.
 7. Avoid repeating same workout routines too often.
+8. "For reps, use these formats:
+    - Single limb exercises: just the number (e.g., '12' for 12 per leg)
+    - Bilateral exercises: the total number
+    - Time or duraion exercise : use time format (01:00 for 60 second)
+9. "For rest, use these formats: use time format (01:00 for 60 second)
 
 📦 Output Format (JSON only):
 {
@@ -183,209 +163,3 @@ Generate a structured 30-day workout plan (from "${startDate}" to "${endDate}") 
   }
 });
 
-// For the other functions, you can either:
-// 1. Use the same approach (no Firebase Auth required)
-// 2. Or pass the userId in the data like generateWorkoutPlan does
-
-/** EDIT Exercise in Routine - No Firebase Auth required */
-exports.editExerciseInRoutine = onCall({
-  enforceAppCheck: false,
-}, async (request) => {
-  logger.info("editExerciseInRoutine called");
-  
-  const {userId, routineId, exerciseId, sets, reps, rest} = request.data;
-  
-  if (!userId) {
-    logger.error("No userId provided in request data");
-    throw new Error("Missing userId parameter");
-  }
-
-  try {
-    if (!routineId || !exerciseId) {
-      throw new Error("Missing required parameters");
-    }
-
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      logger.error("User not found:", userId);
-      throw new Error("User not found");
-    }
-
-    const userData = userDoc.data();
-    const routine = userData.routine || [];
-    
-    const routineIndex = routine.findIndex(r => r.day === routineId);
-    if (routineIndex === -1) {
-      logger.error("Routine not found:", routineId);
-      throw new Error("Routine not found");
-    }
-
-    const exercises = routine[routineIndex].exercises || [];
-    const updatedExercises = exercises.map((ex) =>
-      ex.exercise === exerciseId ? {...ex, sets, reps, rest} : ex,
-    );
-
-    routine[routineIndex].exercises = updatedExercises;
-
-    await db.collection("users").doc(userId).update({
-      routine: routine,
-      updatedAt: new Date().toISOString()
-    });
-
-    logger.info("Exercise updated successfully");
-    return {success: true};
-  } catch (err) {
-    logger.error("❌ Error editing exercise in routine", err);
-    throw new Error("Failed to edit exercise: " + err.message);
-  }
-});
-
-/** DELETE Exercise from Routine - No Firebase Auth required */
-exports.deleteExerciseFromRoutine = onCall({
-  enforceAppCheck: false,
-}, async (request) => {
-  logger.info("deleteExerciseFromRoutine called");
-  
-  const {userId, routineId, exerciseId} = request.data;
-  
-  if (!userId) {
-    logger.error("No userId provided in request data");
-    throw new Error("Missing userId parameter");
-  }
-
-  try {
-    if (!routineId || !exerciseId) {
-      throw new Error("Missing required parameters");
-    }
-
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      logger.error("User not found:", userId);
-      throw new Error("User not found");
-    }
-
-    const userData = userDoc.data();
-    const routine = userData.routine || [];
-    
-    const routineIndex = routine.findIndex(r => r.day === routineId);
-    if (routineIndex === -1) {
-      logger.error("Routine not found:", routineId);
-      throw new Error("Routine not found");
-    }
-
-    const exercises = routine[routineIndex].exercises || [];
-    const updatedExercises = exercises.filter((ex) => ex.exercise !== exerciseId);
-
-    routine[routineIndex].exercises = updatedExercises;
-
-    await db.collection("users").doc(userId).update({
-      routine: routine,
-      updatedAt: new Date().toISOString()
-    });
-
-    logger.info("Exercise deleted successfully");
-    return {success: true};
-  } catch (err) {
-    logger.error("❌ Error deleting exercise from routine", err);
-    throw new Error("Failed to delete exercise: " + err.message);
-  }
-});
-
-/** ADD Exercise to Routine - No Firebase Auth required */
-exports.addExerciseToRoutine = onCall({
-  enforceAppCheck: false,
-}, async (request) => {
-  logger.info("addExerciseToRoutine called");
-  
-  const {userId, routineId, newExercise} = request.data;
-  
-  if (!userId) {
-    logger.error("No userId provided in request data");
-    throw new Error("Missing userId parameter");
-  }
-
-  try {
-    if (!routineId || !newExercise) {
-      throw new Error("Missing required parameters");
-    }
-
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      logger.error("User not found:", userId);
-      throw new Error("User not found");
-    }
-
-    const userData = userDoc.data();
-    const routine = userData.routine || [];
-    
-    const routineIndex = routine.findIndex(r => r.day === routineId);
-    if (routineIndex === -1) {
-      logger.error("Routine not found:", routineId);
-      throw new Error("Routine not found");
-    }
-
-    const exercises = routine[routineIndex].exercises || [];
-    exercises.push(newExercise);
-
-    routine[routineIndex].exercises = exercises;
-
-    await db.collection("users").doc(userId).update({
-      routine: routine,
-      updatedAt: new Date().toISOString()
-    });
-
-    logger.info("Exercise added successfully");
-    return {success: true};
-  } catch (err) {
-    logger.error("❌ Error adding exercise to routine", err);
-    throw new Error("Failed to add exercise: " + err.message);
-  }
-});
-
-/** REORDER Exercises in Routine - No Firebase Auth required */
-exports.reorderExercisesInRoutine = onCall({
-  enforceAppCheck: false,
-}, async (request) => {
-  logger.info("reorderExercisesInRoutine called");
-  
-  const {userId, routineId, reorderedExercises} = request.data;
-  
-  if (!userId) {
-    logger.error("No userId provided in request data");
-    throw new Error("Missing userId parameter");
-  }
-
-  try {
-    if (!routineId || !reorderedExercises) {
-      throw new Error("Missing required parameters");
-    }
-
-    const userDoc = await db.collection("users").doc(userId).get();
-    if (!userDoc.exists) {
-      logger.error("User not found:", userId);
-      throw new Error("User not found");
-    }
-
-    const userData = userDoc.data();
-    const routine = userData.routine || [];
-    
-    const routineIndex = routine.findIndex(r => r.day === routineId);
-    if (routineIndex === -1) {
-      logger.error("Routine not found:", routineId);
-      throw new Error("Routine not found");
-    }
-
-    routine[routineIndex].exercises = reorderedExercises;
-
-    await db.collection("users").doc(userId).update({
-      routine: routine,
-      updatedAt: new Date().toISOString()
-    });
-
-    logger.info("Exercises reordered successfully");
-    return {success: true};
-  } catch (err) {
-    logger.error("❌ Error reordering exercises in routine", err);
-    throw new Error("Failed to reorder exercises: " + err.message);
-  }
-});

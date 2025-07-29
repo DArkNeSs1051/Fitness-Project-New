@@ -4,6 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { shadows } from "~/utils/shadow";
 import { useClerk, useUser } from "@clerk/clerk-expo";
+import { useUserStore } from '~/store/useUserStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AccountScreen() {
   const { user } = useUser();
@@ -50,7 +52,7 @@ export default function AccountScreen() {
       <View className="bg-[#42779F] rounded-[12] flex-1" style={shadows.large}>
         <View className="border-b-[2px] border-[#84BDEA] mt-5 mb-4">
           <Text className="text-center text-white text-xl font-semibold mt-6 mb-6">
-            Hi, {user?.emailAddresses[0]?.emailAddress || "-"}
+            Hi, {user?.firstName || ""} {user?.lastName || ""}
           </Text>
         </View>
 

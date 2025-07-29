@@ -9,24 +9,27 @@ import {
   Platform,
   KeyboardAvoidingView,
   ScrollView,
+  Alert,
 } from "react-native";
+import { useUser } from "@clerk/clerk-expo";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { shadows } from "~/utils/shadow";
+import { useUserStore } from "../../../store/useUserStore";
 
-type ProfileData = {
-  name: string;
+type ProfileFormData = {
+  firstName: string;
+  lastName: string;
   birthdate: Date;
   age: string;
   gender: string;
   email: string;
-  username: string;
-  password: string;
 };
 
+
 const router = useRouter();
-const genderOptions = ["Male", "Female"];
+const genderOptions = ["male", "female"];
 
 const calculateAge = (birthDate: Date): string => {
   const today = new Date();
@@ -43,77 +46,156 @@ const calculateAge = (birthDate: Date): string => {
   return age.toString();
 };
 
-const createInitialProfile = (): ProfileData => {
-  const birthdate = new Date(1999, 0, 15);
-  return {
-    name: "Elena",
-    birthdate: birthdate,
-    age: calculateAge(birthdate),
-    gender: "Female",
-    email: "Elena@gmail.com",
-    username: "Elena1234",
-    password: "••••••",
-  };
-};
-
 export default function ProfileScreen() {
-  const [profile, setProfile] = useState(() => createInitialProfile());
-  const [editedProfile, setEditedProfile] = useState(() =>
-    createInitialProfile()
-  );
+  const { user, isLoaded, isSignedIn } = useUser();
+  const userId = user?.id;
+  
+  const { 
+    user: userProfile,
+    setUserData, 
+    loadUserDataFromFirestore, 
+    saveUserDataToFirestore, 
+    isLoading: storeLoading,
+    error: storeError
+  } = useUserStore();
+  
+  // Initialize empty state
+  const [profile, setProfile] = useState<ProfileFormData | null>(null);
+  const [editedProfile, setEditedProfile] = useState<ProfileFormData | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [hasChanges, setHasChanges] = useState(false);
   const [showGenderPicker, setShowGenderPicker] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  // Fetch user data by userId on component mount
+ useEffect(() => {
+  const loadUserData = async () => {
+    if (!isLoaded) return;
+
+    if (!isSignedIn || !userId) {
+      Alert.alert("Error", "User not logged in. Please log in again.");
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+      await loadUserDataFromFirestore(userId);
+    } catch (error) {
+      console.error("Error fetching user data:", error);
+      Alert.alert("Error", "Failed to load user data.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  loadUserData();
+}, [isLoaded, isSignedIn, userId]);
+
+  // Update local state when user store changes
+  useEffect(() => {
+  if (userProfile) {
+    const birthdate = userProfile.birthday instanceof Date
+      ? userProfile.birthday
+      : userProfile.birthday?.toDate?.() || new Date(1999, 0, 15); // fallback
+
+    const updatedProfile = {
+      firstName: userProfile.firstName || "",
+      lastName: userProfile.lastName || "",
+      birthdate: birthdate,
+      age: userProfile.age?.toString() || calculateAge(birthdate),
+      gender: userProfile.gender || "male",
+      email: userProfile.email || "",
+    };
+
+    setProfile(updatedProfile);
+    setEditedProfile(updatedProfile);
+  }
+}, [userProfile]);
 
   useEffect(() => {
-    const changed = Object.keys(profile).some((key) => {
-      if (key === "birthdate") {
-        return profile[key].getTime() !== editedProfile[key].getTime();
-      }
-      return (
-        profile[key as keyof ProfileData] !==
-        editedProfile[key as keyof ProfileData]
-      );
-    });
-    setHasChanges(changed);
+    if (profile && editedProfile) {
+      const changed = Object.keys(profile).some((key) => {
+        if (key === "birthdate") {
+          return profile[key].getTime() !== editedProfile[key].getTime();
+        }
+        return (
+          profile[key as keyof ProfileFormData] !==
+          editedProfile[key as keyof ProfileFormData]
+        );
+      });
+      setHasChanges(changed);
+    }
   }, [editedProfile, profile]);
 
   // Update age when birthdate changes, but only in edit mode
   useEffect(() => {
-    if (isEditing) {
+    if (isEditing && editedProfile) {
       const newAge = calculateAge(editedProfile.birthdate);
       if (newAge !== editedProfile.age) {
-        setEditedProfile((prev) => ({ ...prev, age: newAge }));
+        setEditedProfile((prev) => prev ? { ...prev, age: newAge } : prev);
       }
     }
-  }, [editedProfile.birthdate, isEditing]);
+  }, [editedProfile?.birthdate, isEditing]);
 
-  const handleChange = (key: keyof ProfileData, value: string | Date) => {
-    setEditedProfile((prev) => ({ ...prev, [key]: value }));
+  const handleChange = (key: keyof ProfileFormData, value: string | Date) => {
+    setEditedProfile((prev) => prev ? { ...prev, [key]: value } : prev);
   };
 
   const handleCancel = () => {
-    setEditedProfile({ ...profile });
-    setIsEditing(false);
-    setHasChanges(false);
+    if (profile) {
+      setEditedProfile({ ...profile });
+      setIsEditing(false);
+      setHasChanges(false);
+    }
   };
 
-  const handleConfirm = () => {
-    // Update age one final time before saving
-    const finalProfile = {
-      ...editedProfile,
-      age: calculateAge(editedProfile.birthdate),
-    };
-    setProfile(finalProfile);
-    setEditedProfile(finalProfile);
-    setIsEditing(false);
-    setHasChanges(false);
+  const handleConfirm = async () => {
+    if (!editedProfile || !userId) return;
+    
+    try {
+      setIsSaving(true);
+      
+      // Update age one final time before saving
+      const finalProfile = {
+        ...editedProfile,
+        age: calculateAge(editedProfile.birthdate),
+      };
+      
+      // Update local state
+      setProfile(finalProfile);
+      setEditedProfile(finalProfile);
+      
+      // Update Zustand store with relevant data
+      const storeData = {
+        firstname: finalProfile.firstName,
+        lastname: finalProfile.lastName,
+        email: finalProfile.email,
+        age: parseInt(finalProfile.age),
+        gender: finalProfile.gender as 'male' | 'female',
+      };
+      
+      setUserData(storeData);
+      
+      // Save to Firestore with userId (using the updated method signature)
+      await saveUserDataToFirestore(userId);
+      
+      setIsEditing(false);
+      setHasChanges(false);
+      
+      Alert.alert("Success", "Profile updated successfully!");
+    } catch (error) {
+      console.error("Error saving profile:", error);
+      Alert.alert("Error", "Failed to update profile. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   // Modified edit toggle function to handle reverting changes
   const handleEditToggle = () => {
-    if (isEditing) {
+    if (isEditing && profile) {
       setEditedProfile({ ...profile });
       setHasChanges(false);
     }
@@ -144,18 +226,43 @@ export default function ProfileScreen() {
     }
   };
 
+  const formatGenderDisplay = (gender: string): string => {
+    return gender.charAt(0).toUpperCase() + gender.slice(1);
+  };
+
+  // Show loading state if user data is not available or still loading
+  if (isLoading || storeLoading || !profile || !editedProfile) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: 'white', fontSize: 18 }}>Loading profile...</Text>
+      </View>
+    );
+  }
+
+  // Show error state if there's an error and no user data
+  if (storeError && !user) {
+    return (
+      <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <Text style={{ color: 'white', fontSize: 16, textAlign: 'center', marginBottom: 20 }}>
+          {storeError}
+        </Text>
+        <TouchableOpacity
+          style={styles.retryButton}
+          onPress={() => userId && loadUserDataFromFirestore(userId)}
+        >
+          <Text style={{ color: 'white' }}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
       keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
     >
-      <ScrollView
-        style={styles.scrollContainer}
-        contentContainerStyle={styles.scrollContentContainer}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={styles.scrollContainer}>
         {/* Header */}
         <View
           className="bg-[#42779F] rounded-[12] flex-1"
@@ -182,6 +289,7 @@ export default function ProfileScreen() {
                 { backgroundColor: isEditing ? "#98c9ee" : "#142939" },
               ]}
               onPress={handleEditToggle}
+              disabled={isSaving}
             >
               <Ionicons
                 name="create"
@@ -201,17 +309,37 @@ export default function ProfileScreen() {
           </View>
 
           {/* Form */}
-          <View className="px-4 py-1">
+          <ScrollView 
+            className="px-4 py-1"
+            contentContainerStyle={styles.scrollContentContainer}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+          >
             <View style={styles.informationWrapper}>
               {/* Name Input */}
               <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Name</Text>
+                <Text style={styles.label}>First name</Text>
                 <TextInput
                   style={styles.input}
                   editable={isEditing}
-                  value={editedProfile.name}
-                  onChangeText={(text) => handleChange("name", text)}
+                  value={editedProfile.firstName}
+                  onChangeText={(text) => handleChange("firstName", text)}
                   returnKeyType="next"
+                  placeholder={!editedProfile.firstName ? "Enter your name" : ""}
+                  placeholderTextColor="#98c9ee"
+                />
+              </View>
+
+              <View style={styles.inputWrapper}>
+                <Text style={styles.label}>Last name</Text>
+                <TextInput
+                  style={styles.input}
+                  editable={isEditing}
+                  value={editedProfile.lastName}
+                  onChangeText={(text) => handleChange("lastName", text)}
+                  returnKeyType="next"
+                  placeholder={!editedProfile.lastName ? "Enter your name" : ""}
+                  placeholderTextColor="#98c9ee"
                 />
               </View>
 
@@ -265,7 +393,7 @@ export default function ProfileScreen() {
                       !isEditing && styles.disabledText,
                     ]}
                   >
-                    {editedProfile.gender}
+                    {formatGenderDisplay(editedProfile.gender)}
                   </Text>
                   {isEditing && (
                     <Ionicons
@@ -280,48 +408,16 @@ export default function ProfileScreen() {
               {/* Email Input */}
               <View style={styles.inputWrapper}>
                 <Text style={styles.label}>Email</Text>
-                <TextInput
-                  style={styles.input}
-                  editable={isEditing}
-                  value={editedProfile.email}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                  onChangeText={(text) => handleChange("email", text)}
-                />
-              </View>
-
-              {/* Username Input */}
-              <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Username</Text>
-                <TextInput
-                  style={styles.input}
-                  editable={isEditing}
-                  value={editedProfile.username}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="next"
-                  onChangeText={(text) => handleChange("username", text)}
-                />
-              </View>
-
-              {/* Password Input */}
-              <View style={styles.inputWrapper}>
-                <Text style={styles.label}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  editable={isEditing}
-                  value={editedProfile.password}
-                  secureTextEntry={true}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  returnKeyType="done"
-                  onChangeText={(text) => handleChange("password", text)}
-                />
+                <View style={[styles.input, styles.pickerInput]}>
+                  <Text style={[styles.inputText, styles.disabledText]}>
+                    {editedProfile.email || "No email provided"}
+                  </Text>
+                  {/* Optional: Add a lock icon to indicate it's read-only */}
+                  <Ionicons name="lock-closed-outline" size={16} color="#98c9ee" />
+                </View>
               </View>
             </View>
-          </View>
+          </ScrollView>
 
           {/* Buttons */}
           {isEditing && (
@@ -329,23 +425,26 @@ export default function ProfileScreen() {
               <TouchableOpacity
                 style={styles.cancelButton}
                 onPress={handleCancel}
+                disabled={isSaving}
               >
                 <Text style={{ color: "#333" }}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={[
                   styles.confirmButton,
-                  { backgroundColor: hasChanges ? "#49a0e1" : "#a9a9a9" },
+                  { backgroundColor: hasChanges && !isSaving ? "#49a0e1" : "#a9a9a9" },
                 ]}
-                disabled={!hasChanges}
+                disabled={!hasChanges || isSaving}
                 onPress={handleConfirm}
               >
-                <Text style={{ color: "white" }}>Confirm</Text>
+                <Text style={{ color: "white" }}>
+                  {isSaving ? "Saving..." : "Confirm"}
+                </Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
-      </ScrollView>
+      </View>
 
       {/* Gender Picker Modal */}
       <Modal
@@ -381,7 +480,7 @@ export default function ProfileScreen() {
                       styles.selectedOptionText,
                   ]}
                 >
-                  {option}
+                  {formatGenderDisplay(option)}
                 </Text>
                 {editedProfile.gender === option && (
                   <Ionicons name="checkmark" size={20} color="#42779F" />
@@ -404,7 +503,6 @@ export default function ProfileScreen() {
           themeVariant="light"
         />
       )}
-
 
       {/* iOS DatePicker Modal Wrapper */}
       {Platform.OS === "ios" && showDatePicker && (
@@ -545,6 +643,13 @@ const styles = StyleSheet.create({
     padding: 12,
     borderRadius: 8,
     alignItems: "center",
+  },
+  retryButton: {
+    backgroundColor: "#42779F",
+    padding: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    minWidth: 100,
   },
   modalOverlay: {
     flex: 1,

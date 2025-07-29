@@ -1,13 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, LayoutAnimation, UIManager, Platform } from 'react-native';
+import { View, Text, ScrollView, TouchableOpacity, TextInput, Image, LayoutAnimation} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEventListener } from 'expo';
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
 import { useExerciseStore } from '../store/useExerciseStore'; 
-import { getDocs, collection } from "firebase/firestore";
-import { FIRESTORE_DB } from "../firebase";
 
 type Category = 'all' | 'upper' | 'lower' | 'core' | 'cardio';
 
@@ -111,7 +109,7 @@ const LibraryScreen = () => {
   const router = useRouter();
   const filterButtonRef = useRef(null);
 
-  const{exercises, fetchExercises } = useExerciseStore();
+  const {exercises, fetchExercises} = useExerciseStore();
   const [loading, setLoading] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -123,7 +121,9 @@ const LibraryScreen = () => {
   const [filterButtonLayout, setFilterButtonLayout] = useState({ y: 0, height: 0 });
 
   useEffect(() => {
+    if (exercises.length === 0) {
     fetchExercises();
+    }
   }, []);
 
 

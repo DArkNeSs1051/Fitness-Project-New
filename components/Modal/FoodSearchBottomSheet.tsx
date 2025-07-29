@@ -1,8 +1,38 @@
-import React, { useState, useMemo, forwardRef, useImperativeHandle, useRef } from 'react';
-import { View, Text, TextInput, FlatList, TouchableOpacity } from 'react-native';
-import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import React, {
+  useState,
+  useMemo,
+  forwardRef,
+  useImperativeHandle,
+  useRef,
+  useEffect,
+} from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  ActivityIndicator,
+} from 'react-native';
+import {
+  BottomSheetModal,
+  BottomSheetBackdrop,
+  BottomSheetView,
+} from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
+import { FIRESTORE_DB } from '~/firebase';
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+} from 'firebase/firestore';
+import { useUser } from '@clerk/clerk-expo';
+import dayjs from 'dayjs';
 
+// Food types
 type Food = {
   name_en: string;
   name_th: string;
@@ -24,26 +54,45 @@ export type FoodSearchBottomSheetRef = {
   dismiss: () => void;
 };
 
-const sampleFoods: Food[] = [
-  { name_en: 'Boiled Egg', name_th: 'ไข่ต้ม', protein: 7, carbs: 0, fat: 6, calories: 82, serving_size: '1 egg' },
-  { name_en: 'Banana', name_th: 'กล้วย', protein: 1, carbs: 27, fat: 0.3, calories: 105, serving_size: '100 g' },
-  { name_en: 'Chicken Breast', name_th: 'อกไก่ต้ม', protein: 31, carbs: 0, fat: 3.6, calories: 165, serving_size: '100 g' },
-  { name_en: 'Brown Rice', name_th: 'ข้าวกล้อง', protein: 2.6, carbs: 23, fat: 0.9, calories: 111, serving_size: '1 cup' },
-  { name_en: 'Apple', name_th: 'แอปเปิ้ล', protein: 0.3, carbs: 25, fat: 0.2, calories: 95, serving_size: '100 g' },
-  { name_en: 'Grill CHicken Breast', name_th: 'อกไก่ย่าง', protein: 32.1, carbs: 0, fat: 3.2, calories: 157, serving_size: '100 g' },
-];
-
 const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(({ onSelect }, ref) => {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
+  const [foods, setFoods] = useState<Food[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [search, setSearch] = useState('');
   const [selectedFoods, setSelectedFoods] = useState<SelectedFood[]>([]);
   const snapPoints = useMemo(() => ['90%'], []);
+  const { user } = useUser();
+  const userId = user?.id;
+
+  useImperativeHandle(ref, () => ({
+    present: () => bottomSheetRef.current?.present(),
+    dismiss: () => bottomSheetRef.current?.dismiss(),
+  }));
+
+  useEffect(() => {
+    const fetchFoods = async () => {
+      try {
+        const snapshot = await getDocs(collection(FIRESTORE_DB, 'foods'));
+        const data = snapshot.docs.map(doc => doc.data() as Food);
+        setFoods(data);
+      } catch (err) {
+        console.error('Error fetching foods:', err);
+        setError('Failed to load foods.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFoods();
+  }, []);
 
   const filteredFoods = useMemo(() => {
-    return sampleFoods.filter((f) =>
-      f.name_en.toLowerCase().includes(search.toLowerCase())
+    return foods.filter((f) =>
+      f.name_en.toLowerCase().includes(search.toLowerCase()) ||
+      f.name_th.toLowerCase().includes(search.toLowerCase())
     );
-  }, [search]);
+  }, [search, foods]);
 
   const totals = useMemo(() => {
     return selectedFoods.reduce(
@@ -57,11 +106,6 @@ const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(({ onS
       { protein: 0, carbs: 0, fat: 0, calories: 0 }
     );
   }, [selectedFoods]);
-
-  useImperativeHandle(ref, () => ({
-    present: () => bottomSheetRef.current?.present(),
-    dismiss: () => bottomSheetRef.current?.dismiss(),
-  }));
 
   const handleSelectFood = (food: Food) => {
     setSelectedFoods((prev) => {
@@ -80,11 +124,17 @@ const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(({ onS
     setSelectedFoods((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleConfirmSelection = () => {
-    onSelect(selectedFoods);
-    setSelectedFoods([]);
-    bottomSheetRef.current?.dismiss();
-  };
+  const handleConfirmSelection = async () => {
+  if (!userId) {
+    Alert.alert('Error', 'User not authenticated');
+    return;
+  }
+
+  onSelect(selectedFoods); // parent handles saving
+
+  setSelectedFoods([]);
+  bottomSheetRef.current?.dismiss();
+};
 
   return (
     <BottomSheetModal
@@ -101,47 +151,56 @@ const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(({ onS
         <Text className="text-xl font-bold mb-4 text-center">Search Food</Text>
         <TextInput
           placeholder="Search food..."
+          placeholderTextColor="#999"
           value={search}
           onChangeText={setSearch}
           className="border p-3 rounded-md mb-4"
-          autoCapitalize="none"
-          autoCorrect={false}
         />
-        <FlatList
-          data={filteredFoods}
-          keyExtractor={(item) => item.name_en}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              onPress={() => handleSelectFood(item)}
-              className="py-3 px-2 border-b border-gray-200"
-            >
-              <View className="flex-row justify-between">
-                <View>
-                  <Text className="font-bold text-[#142939] text-lg">{item.name_en}</Text>
-                  <Text className="font-bold text-[#142939] text-md">{item.name_th}</Text>
+
+        {loading ? (
+          <ActivityIndicator size="large" color="#5FA3D6" className="mt-4" />
+        ) : error ? (
+          <Text className="text-red-500 text-center">{error}</Text>
+        ) : (
+          <FlatList
+            data={filteredFoods}
+            keyExtractor={(item) => item.name_en}
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                onPress={() => handleSelectFood(item)}
+                className="py-3 px-2 border-b border-gray-200"
+              >
+                <View className="flex-row justify-between">
+                  <View>
+                    <Text className="font-bold text-[#142939] text-lg">{item.name_en}</Text>
+                    <Text className="font-bold text-[#142939] text-md">{item.name_th}</Text>
+                  </View>
+                  <Text className="font-bold text-[#142939] text-lg">{item.serving_size}</Text>
                 </View>
-                <Text className="font-bold text-[#142939] text-lg">{item.serving_size}</Text>
-              </View>
-              <Text className="text-gray-600 text-sm mt-1">
-                Protein: {item.protein}g | Carbs: {item.carbs}g | Fat: {item.fat}g | Calories: {item.calories}
+                <Text className="text-gray-600 text-sm mt-1">
+                  Protein: {item.protein}g | Carbs: {item.carbs}g | Fat: {item.fat}g | Calories: {item.calories}
+                </Text>
+              </TouchableOpacity>
+            )}
+            ListEmptyComponent={
+              <Text className="text-center text-gray-500 mt-4">
+                No foods found for "{search}"
               </Text>
-            </TouchableOpacity>
-          )}
-          showsVerticalScrollIndicator={false}
-        />
+            }
+            showsVerticalScrollIndicator={false}
+          />
+        )}
 
         {selectedFoods.length > 0 && (
           <View className="mt-6 border-t pt-4">
             <Text className="font-bold mb-2 text-lg">Selected Foods</Text>
-
             {selectedFoods.map((food, index) => (
               <View key={index} className="flex-row justify-between items-center mb-2">
                 <View className="flex-1">
                   <Text className="text-sm text-gray-700">
-                    • {food.name_en} ({food.calories * food.quantity} kcal)
+                    • {food.name_en} ({(food.calories * food.quantity).toFixed(0)} kcal)
                   </Text>
                 </View>
-
                 <View className="flex-row items-center space-x-2">
                   <TouchableOpacity
                     onPress={() => {
