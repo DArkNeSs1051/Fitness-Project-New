@@ -3,7 +3,7 @@ import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import { doc, setDoc } from "firebase/firestore";
 import { useState } from "react";
-import { Text, View } from "react-native";
+import { Text, View, KeyboardAvoidingView, ScrollView, TouchableWithoutFeedback, Platform, Keyboard } from "react-native";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import TextInputCustom from "~/components/BBComponents/TextInputCustom";
@@ -118,58 +118,83 @@ const SignUp = () => {
   }
 
   return (
-    <View className={twMerge("flex-1 bg-[#84BDEA]")}>
-      <View className="h-[70px] justify-center px-5">
-        <Arrow onPress={clickToSignIn} />
-      </View>
-      <View className="flex flex-col gap-10 items-center">
-        <Text className={classes.title}>Create Account</Text>
+    
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={45}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        <View style={{ flex: 1, backgroundColor: "#84BDEA" }}>
+          {/* Header */}
+          <View className="h-[70px] justify-center px-5">
+            <Arrow onPress={clickToSignIn} />
+          </View>
 
-        <View className="flex flex-col gap-10">
-          <TextInputCustom
-            title="First Name"
-            placeholder="Enter your first name"
-            value={form.fistName}
-            onChangeText={(text) => onChangeForm("fistName", text)}
-          />
-          <TextInputCustom
-            title="Last Name"
-            placeholder="Enter your last name"
-            value={form.lastName}
-            onChangeText={(text) => onChangeForm("lastName", text)}
-          />
-          <TextInputCustom
-            title="Email"
-            placeholder="Enter your email"
-            value={form.emailAddress}
-            onChangeText={(text) => onChangeForm("emailAddress", text)}
-            keyboardType="email-address"
-            autoComplete="email"
-            textContentType="emailAddress"
-          />
-          <TextInputCustom
-            title="Password"
-            placeholder="Enter your password"
-            value={form.password}
-            onChangeText={(text) => onChangeForm("password", text)}
-            secureTextEntry
-          />
-          <TextInputCustom
-            title="Confirm Password"
-            placeholder="Enter your confirm password"
-            value={form.confirmPassword}
-            onChangeText={(text) => onChangeForm("confirmPassword", text)}
-            secureTextEntry
-          />
-          <ButtonCustom
-            text="Create Account"
-            textColor="#EEEEF0"
-            bgColor="#142939"
-            onClick={onSignUpPress}
-          />
+          {/* Title */}
+          <Text className="text-3xl font-bold text-[#142939] text-center mb-4">
+            Create Account
+          </Text>
+
+          {/* Inputs Scrollable */}
+          <ScrollView
+            contentContainerStyle={{
+              marginTop: 50,
+              justifyContent: "center",
+              marginLeft: 65,
+            }}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={{ gap: 20 }}>
+              <TextInputCustom
+                title="First Name"
+                placeholder="Enter your first name"
+                value={form.fistName}
+                onChangeText={(text) => onChangeForm("fistName", text)}
+              />
+              <TextInputCustom
+                title="Last Name"
+                placeholder="Enter your last name"
+                value={form.lastName}
+                onChangeText={(text) => onChangeForm("lastName", text)}
+              />
+              <TextInputCustom
+                title="Email"
+                placeholder="Enter your email"
+                value={form.emailAddress}
+                onChangeText={(text) => onChangeForm("emailAddress", text)}
+                keyboardType="email-address"
+                autoComplete="email"
+                textContentType="emailAddress"
+              />
+              <TextInputCustom
+                title="Password"
+                placeholder="Enter your password"
+                value={form.password}
+                onChangeText={(text) => onChangeForm("password", text)}
+                secureTextEntry
+              />
+              <TextInputCustom
+                title="Confirm Password"
+                placeholder="Enter your confirm password"
+                value={form.confirmPassword}
+                onChangeText={(text) => onChangeForm("confirmPassword", text)}
+                secureTextEntry
+              />
+
+              <ButtonCustom
+                text="Create Account"
+                textColor="#EEEEF0"
+                bgColor="#142939"
+                onClick={onSignUpPress}
+              />
+            </View>
+          </ScrollView>
         </View>
-      </View>
-    </View>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
+
   );
 };
 

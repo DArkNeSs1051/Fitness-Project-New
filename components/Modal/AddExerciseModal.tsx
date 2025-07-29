@@ -1,25 +1,25 @@
-import React, { useRef, useMemo, useState, useCallback, forwardRef, useImperativeHandle } from 'react';
+import React, { useRef, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
 import {
   View,
   Text,
-  FlatList,
   TextInput,
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { BottomSheetModal, BottomSheetBackdrop, BottomSheetView } from '@gorhom/bottom-sheet';
+import { BottomSheetModal, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 
-const muscleGroups = ['Chest', 'Back', 'Arms', 'Legs', 'Core'];
+const muscle = ['Chest', 'Back', 'Arms', 'Legs', 'Core', 'Shoulders'];
 const equipmentTypes = ['None', 'Dumbbell', 'Barbell', 'Machine'];
 
 export interface Exercise {
   id: string;
+  name: string;
   exercise: string;
   target: string;
   reps: number;
   sets: number;
   rest: string;
-  muscleGroup: string;
+  muscleGroups: string;
   equipment: string;
 }
 
@@ -44,8 +44,8 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
 
     const filteredExercises = useMemo(() => {
       return availableExercises.filter((ex) => {
-        const matchesSearch = ex.exercise.toLowerCase().includes(search.toLowerCase());
-        const matchesMuscle = selectedMuscle ? ex.muscleGroup === selectedMuscle : true;
+        const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase());
+        const matchesMuscle = selectedMuscle ? ex.muscleGroups.includes(selectedMuscle) : true;
         const matchesEquipment = selectedEquipment ? ex.equipment === selectedEquipment : true;
         return matchesSearch && matchesMuscle && matchesEquipment;
       });
@@ -82,7 +82,7 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
         snapPoints={snapPoints}
         backdropComponent={(props) => <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} />}
       >
-        <BottomSheetView style={styles.container}>
+        <BottomSheetScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Add Exercise</Text>
           <TextInput
             placeholder="Search Exercises"
@@ -93,31 +93,29 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
           />
 
           <Text style={styles.filterTitle}>Muscle Groups</Text>
-          {renderFilterChips(muscleGroups, selectedMuscle, setSelectedMuscle)}
+          {renderFilterChips(muscle, selectedMuscle, setSelectedMuscle)}
 
           <Text style={styles.filterTitle}>Equipment</Text>
           {renderFilterChips(equipmentTypes, selectedEquipment, setSelectedEquipment)}
 
-          <FlatList
-            data={filteredExercises}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={{ paddingBottom: 80 }}
-            renderItem={({ item }) => (
-              <TouchableOpacity
-                style={styles.exerciseItem}
-                onPress={() => {
-                  onSelectExercise(item);
-                  bottomSheetModalRef.current?.dismiss();
-                }}
-              >
-                <Text style={styles.exerciseName}>{item.exercise}</Text>
-                <Text style={styles.exerciseDetails}>
-                  {item.muscleGroup} | {item.equipment} | {item.reps} reps · {item.sets} sets · {item.rest} rest
-                </Text>
-              </TouchableOpacity>
-            )}
-          />
-        </BottomSheetView>
+          {/* Now just map exercises without FlatList */}
+          {filteredExercises.map((item) => (
+            <TouchableOpacity
+              key={item.id}
+              style={styles.exerciseItem}
+              onPress={() => {
+                onSelectExercise(item);
+                bottomSheetModalRef.current?.dismiss();
+              }}
+            >
+              <Text style={styles.exerciseName}>{item.name}</Text>
+              <Text style={styles.exerciseDetails}>
+                {(item.muscleGroups || []).join(", ")} | {item.equipment} | {item.reps} reps · {item.sets} sets · {item.rest} rest
+              </Text>
+            </TouchableOpacity>
+          ))}
+
+        </BottomSheetScrollView>
       </BottomSheetModal>
     );
   }
@@ -126,7 +124,8 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    flex: 1,
+    // flexGrow is important to allow scroll
+    flexGrow: 1,
   },
   title: {
     fontSize: 18,

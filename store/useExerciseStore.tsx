@@ -18,7 +18,11 @@ export const useExerciseStore = create<ExerciseStore>((set) => ({
   exercises: [],
   fetchExercises: async () => {
     const snapshot = await getDocs(collection(FIRESTORE_DB, "exercises"));
-    const data = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const data = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      name: doc.data().name,
+      ...doc.data(),
+    }));
     set({ exercises: data });
   },
 }));
