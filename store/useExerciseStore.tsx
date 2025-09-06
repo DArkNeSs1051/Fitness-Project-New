@@ -1,6 +1,6 @@
-import { create } from 'zustand';
-import { getDocs, collection } from 'firebase/firestore';
-import { FIRESTORE_DB } from '../firebase';
+import { create } from "zustand";
+import { getDocs, collection } from "firebase/firestore";
+import { FIRESTORE_DB } from "../firebase";
 
 type Exercise = {
   id: string;

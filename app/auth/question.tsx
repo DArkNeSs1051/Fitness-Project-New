@@ -1,31 +1,33 @@
-import { useUser } from "@clerk/clerk-expo";
-import { getAuth, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
-import { useAuth  } from "@clerk/clerk-expo";
+import { useAuth, useUser } from "@clerk/clerk-expo";
 import { OPENAI_API_KEY } from "@env";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import dayjs from "dayjs";
 import { router } from "expo-router";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithCustomToken,
+} from "firebase/auth";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { httpsCallable } from "firebase/functions";
 import OpenAI from "openai";
 import React, { useEffect, useState } from "react";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "~/firebase";
 import {
+  Keyboard,
+  Modal,
   Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
-  ScrollView,
-  Modal,
-  StyleSheet,
-  Keyboard,
-  TouchableWithoutFeedback
 } from "react-native";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
-import { FIRESTORE_DB } from "~/firebase";
+import { FIRESTORE_DB, functions } from "~/firebase";
 import Arrow from "../../assets/images/Image/Arrow.svg";
 import Dumbbell from "../../assets/images/Image/Dumbbell.svg";
 import DumbbellWhite from "../../assets/images/Image/DumbbellWhite.svg";
@@ -109,7 +111,7 @@ const Question = () => {
   const [exercises, setExercises] = useState<any[]>([]);
 
   const handleDateConfirm = (selectedDate: Date) => {
-    const ageYear = dayjs().diff(dayjs(selectedDate), 'year').toString();
+    const ageYear = dayjs().diff(dayjs(selectedDate), "year").toString();
     setForm((prev) => ({
       ...prev,
       birthday: selectedDate,
@@ -117,7 +119,7 @@ const Question = () => {
     }));
     setErrors((prev) => ({
       ...prev,
-      birthday: '',
+      birthday: "",
     }));
     setshowDatePicker(false);
   };
@@ -151,7 +153,7 @@ const Question = () => {
   const handleDateChange = (_: any, selectedDate?: Date) => {
     if (!selectedDate) return;
 
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       handleDateConfirm(selectedDate);
     } else {
       setTempDate(selectedDate);
@@ -159,115 +161,119 @@ const Question = () => {
   };
 
   const { getToken } = useAuth();
-const signIntoFirebaseWithClerk = async () => {
-  const token = await getToken({ template: "integration_firebase" });
+  const signIntoFirebaseWithClerk = async () => {
+    const token = await getToken({ template: "integration_firebase" });
 
-  if (!token) throw new Error("No Clerk token");
+    if (!token) throw new Error("No Clerk token");
 
-  const auth = getAuth();
-  const userCredential = await signInWithCustomToken(auth, token);
-  console.log("✅ Firebase signInWithCustomToken completed:", userCredential.user.uid);
-
-  // ✅ Wait for Firebase Auth to be fully initialized
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error("Firebase auth state timeout"));
-    }, 5000);
-
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser && firebaseUser.uid === userCredential.user.uid) {
-        clearTimeout(timeout);
-        unsubscribe();
-        console.log("✅ Firebase auth state confirmed:", firebaseUser.uid);
-        resolve(firebaseUser);
-      }
-    });
-  });
-};
-
-const fetchWorkoutPlan = async () => {
-  try {
-    setLoading(true);
-    
-    // ✅ FIRST: Sign into Firebase and wait for completion
-    await signIntoFirebaseWithClerk();
-    
-    // ✅ SECOND: Double-check auth state
     const auth = getAuth();
-    console.log("🔥 Firebase currentUser after auth:", auth.currentUser?.uid);
+    const userCredential = await signInWithCustomToken(auth, token);
+    console.log(
+      "✅ Firebase signInWithCustomToken completed:",
+      userCredential.user.uid
+    );
 
-    if (!auth.currentUser) {
-      throw new Error("Firebase user not authenticated after sign-in!");
-    }
+    // ✅ Wait for Firebase Auth to be fully initialized
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Firebase auth state timeout"));
+      }, 5000);
 
-    // ✅ THIRD: Now safe to call the function
-    const generateWorkoutPlan = httpsCallable(functions, "generateWorkoutPlan");
-    const result = await generateWorkoutPlan({
-      // You can pass form data here if needed
-      userData: form
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser && firebaseUser.uid === userCredential.user.uid) {
+          clearTimeout(timeout);
+          unsubscribe();
+          console.log("✅ Firebase auth state confirmed:", firebaseUser.uid);
+          resolve(firebaseUser);
+        }
+      });
     });
+  };
 
-    console.log("✅ Workout plan result:", result.data);
-    router.replace("/workout");
-    
-  } catch (error) {
-    console.error("❌ Error generating workout plan:", error);
-    alert("เกิดข้อผิดพลาดในการสร้างแผนออกกำลังกาย");
-  } finally {
-    setLoading(false);
-  }
-};
+  const fetchWorkoutPlan = async () => {
+    try {
+      setLoading(true);
 
-const upDateUser = async () => {
-  if (!user?.id) {
-    console.log("❌ No user ID available");
-    return;
-  }
+      // ✅ FIRST: Sign into Firebase and wait for completion
+      await signIntoFirebaseWithClerk();
 
-  try {
-    setLoading(true);
-    console.log("✅ Updating user data...");
-    
-    const userRef = doc(FIRESTORE_DB, "users", user.id);
-    const userDocSnap = await getDoc(userRef);
+      // ✅ SECOND: Double-check auth state
+      const auth = getAuth();
+      console.log("🔥 Firebase currentUser after auth:", auth.currentUser?.uid);
 
-    if (userDocSnap.exists()) {
-      const updatedData = {
-        gender: form.gender.toLocaleLowerCase(),
-        age: form.age,
-        birthday: form.birthday,
-        weight: form.weight,
-        weightUnit: form.weightUnit,
-        height: form.height,
-        heightUnit: form.heightUnit,
-        level: form.level.toLocaleLowerCase(),
-        goal: form.goal.toLocaleLowerCase(),
-        equipment: form.equipment,
-        activity: form.activity.toLocaleLowerCase(),
-        workoutDay: form.workoutDay,
-        updatedAt: new Date().toISOString(),
-        isFirstLogin: false,
-        isFirstPlan: true,
-      };
+      if (!auth.currentUser) {
+        throw new Error("Firebase user not authenticated after sign-in!");
+      }
 
-      await setDoc(userRef, updatedData, { merge: true });
-      console.log("✅ User data updated successfully");
-      
-      // ✅ Wait a moment for Firestore to sync, then generate workout plan
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      await fetchWorkoutPlan();
-      
-    } else {
-      console.log("❌ User document does not exist");
-      alert("ไม่พบข้อมูลผู้ใช้");
+      // ✅ THIRD: Now safe to call the function
+      const generateWorkoutPlan = httpsCallable(
+        functions,
+        "generateWorkoutPlan"
+      );
+      const result = await generateWorkoutPlan({
+        // You can pass form data here if needed
+        userData: form,
+      });
+
+      console.log("✅ Workout plan result:", result.data);
+      router.replace("/workout");
+    } catch (error) {
+      console.error("❌ Error generating workout plan:", error);
+      alert("เกิดข้อผิดพลาดในการสร้างแผนออกกำลังกาย");
+    } finally {
+      setLoading(false);
     }
-  } catch (error) {
-    console.error("❌ Error updating user:", error);
-    alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
+
+  const upDateUser = async () => {
+    if (!user?.id) {
+      console.log("❌ No user ID available");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log("✅ Updating user data...");
+
+      const userRef = doc(FIRESTORE_DB, "users", user.id);
+      const userDocSnap = await getDoc(userRef);
+
+      if (userDocSnap.exists()) {
+        const updatedData = {
+          gender: form.gender.toLocaleLowerCase(),
+          age: form.age,
+          birthday: form.birthday,
+          weight: form.weight,
+          weightUnit: form.weightUnit,
+          height: form.height,
+          heightUnit: form.heightUnit,
+          level: form.level.toLocaleLowerCase(),
+          goal: form.goal.toLocaleLowerCase(),
+          equipment: form.equipment,
+          activity: form.activity.toLocaleLowerCase(),
+          workoutDay: form.workoutDay,
+          updatedAt: new Date().toISOString(),
+          isFirstLogin: false,
+          isFirstPlan: true,
+        };
+
+        await setDoc(userRef, updatedData, { merge: true });
+        console.log("✅ User data updated successfully");
+
+        // ✅ Wait a moment for Firestore to sync, then generate workout plan
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        await fetchWorkoutPlan();
+      } else {
+        console.log("❌ User document does not exist");
+        alert("ไม่พบข้อมูลผู้ใช้");
+      }
+    } catch (error) {
+      console.error("❌ Error updating user:", error);
+      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleNextState = () => {
     if (states === 1) {
@@ -438,7 +444,7 @@ const upDateUser = async () => {
               {showDatePicker && (
                 <>
                   {/* Android: show inline picker */}
-                  {Platform.OS === 'android' && (
+                  {Platform.OS === "android" && (
                     <DateTimePicker
                       value={form.birthday ?? new Date()}
                       mode="date"
@@ -451,7 +457,7 @@ const upDateUser = async () => {
                   )}
 
                   {/* iOS: show modal */}
-                  {Platform.OS === 'ios' && (
+                  {Platform.OS === "ios" && (
                     <Modal
                       transparent
                       animationType="fade"
@@ -461,12 +467,25 @@ const upDateUser = async () => {
                       <View style={styles.modalOverlay}>
                         <View style={styles.datePickerModalContent}>
                           <View style={styles.modalHeader}>
-                            <TouchableOpacity onPress={() => setshowDatePicker(false)}>
+                            <TouchableOpacity
+                              onPress={() => setshowDatePicker(false)}
+                            >
                               <Text style={styles.modalButtonText}>Cancel</Text>
                             </TouchableOpacity>
-                            <Text style={styles.modalTitle}>Select Birthdate</Text>
-                            <TouchableOpacity onPress={() => handleDateConfirm(tempDate)}>
-                              <Text style={[styles.modalButtonText, styles.doneButton]}>Done</Text>
+                            <Text style={styles.modalTitle}>
+                              Select Birthdate
+                            </Text>
+                            <TouchableOpacity
+                              onPress={() => handleDateConfirm(tempDate)}
+                            >
+                              <Text
+                                style={[
+                                  styles.modalButtonText,
+                                  styles.doneButton,
+                                ]}
+                              >
+                                Done
+                              </Text>
                             </TouchableOpacity>
                           </View>
                           <DateTimePicker
@@ -509,7 +528,9 @@ const upDateUser = async () => {
                       <Text
                         className={twMerge(
                           "text-[10px] text-center",
-                          form.weightUnit === "kg" ? "text-[#FDFDFF]" : "text-[#142939]"
+                          form.weightUnit === "kg"
+                            ? "text-[#FDFDFF]"
+                            : "text-[#142939]"
                         )}
                       >
                         KG
@@ -524,7 +545,9 @@ const upDateUser = async () => {
                       <Text
                         className={twMerge(
                           "text-[10px] text-center",
-                          form.weightUnit === "lbs" ? "text-[#FDFDFF]" : "text-[#142939]"
+                          form.weightUnit === "lbs"
+                            ? "text-[#FDFDFF]"
+                            : "text-[#142939]"
                         )}
                       >
                         Lbs
@@ -562,7 +585,9 @@ const upDateUser = async () => {
                       <Text
                         className={twMerge(
                           "text-[10px] text-center",
-                          form.heightUnit === "cm" ? "text-[#FDFDFF]" : "text-[#142939]"
+                          form.heightUnit === "cm"
+                            ? "text-[#FDFDFF]"
+                            : "text-[#142939]"
                         )}
                       >
                         CM
@@ -577,7 +602,9 @@ const upDateUser = async () => {
                       <Text
                         className={twMerge(
                           "text-[10px] text-center",
-                          form.heightUnit === "ft" ? "text-[#FDFDFF]" : "text-[#142939]"
+                          form.heightUnit === "ft"
+                            ? "text-[#FDFDFF]"
+                            : "text-[#142939]"
                         )}
                       >
                         Ft
@@ -625,7 +652,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.level === "beginner" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -651,7 +678,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.level === "intermediate" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -677,7 +704,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.level === "advance" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -719,7 +746,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.goal === "lose weight" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -745,7 +772,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.goal === "gain muscle" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -771,7 +798,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.goal === "maintain weight" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -822,7 +849,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.equipment === "None" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -855,7 +882,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.equipment === "Full Gym" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -888,7 +915,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.equipment === "Dumbbell" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -931,7 +958,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "sedentary" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -960,7 +987,7 @@ const upDateUser = async () => {
                         classes.rounded,
 
                         form.activity === "lightly active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -971,14 +998,18 @@ const upDateUser = async () => {
                     className={twMerge(
                       classes.boxRounded2,
                       "text-wrap pr-10 pl-4 w-[300px]",
-                      form.activity === "moderately active" && "border-[#FDFDFF]"
+                      form.activity === "moderately active" &&
+                        "border-[#FDFDFF]"
                     )}
-                    onPress={() => onChangeForm("activity", "moderately active")}
+                    onPress={() =>
+                      onChangeForm("activity", "moderately active")
+                    }
                   >
                     <Text
                       className={twMerge(
                         classes.text,
-                        form.activity === "moderately active" && "text-[#FDFDFF]"
+                        form.activity === "moderately active" &&
+                          "text-[#FDFDFF]"
                       )}
                     >
                       Moderately active (moderate exercise or sports 3-5
@@ -988,7 +1019,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "moderately active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1015,7 +1046,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "very active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1042,7 +1073,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "extra active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1084,7 +1115,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 1 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1111,7 +1142,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 2 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1138,7 +1169,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 3 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1165,7 +1196,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 4 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1192,7 +1223,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 5 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1219,7 +1250,7 @@ const upDateUser = async () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 6 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1245,33 +1276,33 @@ export default Question;
 const styles = StyleSheet.create({
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: "flex-end",
   },
   datePickerModalContent: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
     padding: 16,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
   },
   modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     marginBottom: 10,
   },
   modalTitle: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
     fontSize: 16,
   },
   modalButtonText: {
     fontSize: 16,
-    color: '#5FA3D6',
+    color: "#5FA3D6",
   },
   doneButton: {
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   dateTimePicker: {
-    backgroundColor: 'white',
+    backgroundColor: "white",
   },
 });
