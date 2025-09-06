@@ -1,9 +1,18 @@
-import { useSignUp } from "@clerk/clerk-expo";
+import { useSignUp, useAuth } from "@clerk/clerk-expo";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
+import { getAuth, onAuthStateChanged, signInWithCustomToken } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
-import { useState } from "react";
-import { Text, View, KeyboardAvoidingView, ScrollView, TouchableWithoutFeedback, Platform, Keyboard } from "react-native";
+import React, { useState } from "react";
+import {
+  Text,
+  View,
+  KeyboardAvoidingView,
+  ScrollView,
+  TouchableWithoutFeedback,
+  Platform,
+  Keyboard,
+} from "react-native";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import TextInputCustom from "~/components/BBComponents/TextInputCustom";
@@ -16,11 +25,14 @@ const classes = {
 
 const SignUp = () => {
   const { isLoaded, signUp, setActive } = useSignUp();
+  const { getToken } = useAuth();
   const router = useRouter();
 
   const [pendingVerification, setPendingVerification] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
   const [form, setForm] = useState({
-    fistName: "",
+    firstName: "",
     lastName: "",
     emailAddress: "",
     password: "",
@@ -28,7 +40,7 @@ const SignUp = () => {
     code: "",
   });
 
-  const onChangeForm = (key: string, value: string) => {
+  const onChangeForm = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
   };
 
@@ -37,7 +49,7 @@ const SignUp = () => {
   };
 
   const onSignUpPress = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || submitting) return;
 
     if (form.password !== form.confirmPassword) {
       alert("รหัสผ่านไม่ตรงกัน");
@@ -45,8 +57,10 @@ const SignUp = () => {
     }
 
     try {
+      setSubmitting(true);
+
       await signUp.create({
-        firstName: form.fistName,
+        firstName: form.firstName,
         lastName: form.lastName,
         emailAddress: form.emailAddress,
         password: form.password,
@@ -58,49 +72,76 @@ const SignUp = () => {
 
       setPendingVerification(true);
     } catch (err: any) {
-      alert(err.message || "Something went wrong");
+      alert(err?.message || "Something went wrong");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   const onVerifyPress = async () => {
-    if (!isLoaded) return;
+    if (!isLoaded || submitting) return;
 
     try {
+      setSubmitting(true);
+
+      // Verify email code with Clerk
       const signUpAttempt = await signUp.attemptEmailAddressVerification({
-        code: form.code,
+        code: form.code.trim(),
+      });
+      console.log("Clerk verify result:", signUpAttempt?.status);
+
+      if (signUpAttempt.status !== "complete") {
+        alert("Verification email sent. Please check your inbox.");
+        return;
+      }
+
+      // Activate Clerk session on this device
+      await setActive({ session: signUpAttempt.createdSessionId });
+
+      // Sign into Firebase using Clerk custom token (same template you use in SignIn)
+      const customToken = await getToken({ template: "integration_firebase" });
+      if (!customToken) throw new Error("Missing Clerk Firebase token");
+
+      const auth = getAuth();
+      await signInWithCustomToken(auth, customToken);
+
+      // Wait for Firebase auth state so Firestore rules see request.auth
+      await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => reject(new Error("Firebase auth timeout")), 7000);
+        const unsub = onAuthStateChanged(auth, (u) => {
+          if (u) {
+            clearTimeout(timeout);
+            unsub();
+            resolve(true);
+          }
+        });
       });
 
-      if (signUpAttempt.status === "complete") {
-        await setActive({ session: signUpAttempt.createdSessionId });
-
-        const createdUserId = signUpAttempt.createdUserId;
-
-        if (createdUserId) {
-          await setDoc(doc(FIRESTORE_DB, "users", createdUserId), {
-            firstName: form.fistName,
-            lastName: form.lastName,
-            email: form.emailAddress,
-            createdAt: dayjs().toISOString(),
-            isFirstLogin: true,
-          });
-
-          router.replace("/workout");
-        }
-      } else {
-        alert("Verification email sent. Please check your inbox.");
+      //  Now Firestore write is authorized
+      const createdUserId = signUpAttempt.createdUserId;
+      if (createdUserId) {
+        await setDoc(doc(FIRESTORE_DB, "users", createdUserId), {
+          firstName: form.firstName,
+          lastName: form.lastName,
+          email: form.emailAddress,
+          createdAt: dayjs().toISOString(),
+          isFirstLogin: true,
+        });
       }
-    } catch (err) {
-      alert("Verification failed. Please try again.");
+
+      // Navigate into the app
+      router.replace("/workout");
+    } catch (err: any) {
+      console.log("onVerifyPress error:", err);
+      alert(err?.message ?? "Verification failed. Please try again.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
   if (pendingVerification) {
     return (
-      <View
-        className={twMerge(
-          "flex-1 items-center justify-center bg-[#84BDEA] gap-10"
-        )}
-      >
+      <View className={twMerge("flex-1 items-center justify-center bg-[#84BDEA] gap-10")}>
         <TextInputCustom
           value={form.code}
           title="Verification Code"
@@ -108,17 +149,17 @@ const SignUp = () => {
           onChangeText={(text) => onChangeForm("code", text)}
         />
         <ButtonCustom
-          text="Confirm Verification"
+          text={submitting ? "Verifying..." : "Confirm Verification"}
           textColor="#EEEEF0"
           bgColor="#142939"
           onClick={onVerifyPress}
+          disabled={submitting || !form.code.trim()}
         />
       </View>
     );
   }
 
   return (
-    
     <KeyboardAvoidingView
       style={{ flex: 1 }}
       behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -150,8 +191,8 @@ const SignUp = () => {
               <TextInputCustom
                 title="First Name"
                 placeholder="Enter your first name"
-                value={form.fistName}
-                onChangeText={(text) => onChangeForm("fistName", text)}
+                value={form.firstName}
+                onChangeText={(text) => onChangeForm("firstName", text)}
               />
               <TextInputCustom
                 title="Last Name"
@@ -167,6 +208,7 @@ const SignUp = () => {
                 keyboardType="email-address"
                 autoComplete="email"
                 textContentType="emailAddress"
+                autoCapitalize="none"
               />
               <TextInputCustom
                 title="Password"
@@ -184,17 +226,24 @@ const SignUp = () => {
               />
 
               <ButtonCustom
-                text="Create Account"
+                text={submitting ? "Creating..." : "Create Account"}
                 textColor="#EEEEF0"
                 bgColor="#142939"
                 onClick={onSignUpPress}
+                disabled={
+                  submitting ||
+                  !form.firstName.trim() ||
+                  !form.lastName.trim() ||
+                  !form.emailAddress.trim() ||
+                  !form.password ||
+                  !form.confirmPassword
+                }
               />
             </View>
           </ScrollView>
         </View>
       </TouchableWithoutFeedback>
     </KeyboardAvoidingView>
-
   );
 };
 

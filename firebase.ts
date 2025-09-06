@@ -1,8 +1,9 @@
 // firebase.ts
-import { initializeApp, getApps } from "firebase/app";
+import { getApps, initializeApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
-import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage";
 
 // Firebase config
 const firebaseConfig = {
@@ -23,3 +24,4 @@ export const FIREBASE_APP = app;
 export const FIRESTORE_DB = getFirestore(app);
 export const FIREBASE_AUTH = getAuth(app);
 export const functions = getFunctions(app);
+export const FIREBASE_STORE = getStorage(app);

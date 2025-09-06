@@ -6,14 +6,19 @@ const logger = require("firebase-functions/logger");
 const { OpenAI } = require("openai");
 const dayjs = require("dayjs");
 
+const utc = require("dayjs/plugin/utc");
+const timezone = require("dayjs/plugin/timezone");
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
 initializeApp();
 const db = getFirestore();
 
-/** ---------------- helpers ---------------- */
-const MAX_EX_LIBRARY = 80;   // cap exercises sent to the model
-const MAX_EX_PER_DAY = 4;    // cap exercises written per day (defensive)
+
+const MAX_EX_LIBRARY = 80;   
+const MAX_EX_PER_DAY = 4;    
 
 const norm = (s) => String(s ?? "").trim();
 
@@ -53,7 +58,7 @@ User:
 - equipment: ${userData.equipment}
 
 Exercises (use ONLY from this list by exact "name"):
-${JSON.stringify(allowedLite)}  // compact, no pretty-print
+${JSON.stringify(allowedLite)}
 
 Rules:
 1) Exactly ${userData.workoutDay} sessions/week (~${userData.workoutDay * 4}-${userData.workoutDay * 5} total). Other days are "Rest Day" with empty exercises.
@@ -62,8 +67,8 @@ Rules:
 4) Respect equipment limits: None=bodyweight only; Dumbbell=bodyweight or dumbbell; else=full gym allowed.
 5) Format rules:
   - For strength/rep exercises → reps is a plain number, e.g. "12"
-  - For static/time exercises like Plank, Side Plank, Wall Sit → reps must be in mm:ss format, e.g. "00:30"
-  - Single limb exercises: the total number (e.g., '30' for 15 per leg)
+  - For static/time exercises like Plank, Side Plank, Wall Sit → reps must be mm:ss, e.g. "00:30"
+  - Single limb exercises: the total number (e.g., "30" for 15/side)
   - Rest must always be mm:ss, e.g. "01:00"
 
 Dates: "${startDate}" .. "${endDate}"
@@ -93,13 +98,15 @@ Return JSON ONLY (no markdown, no extra text):
 
 exports.generateWorkoutPlan = onCall(
   {
-    region: "us-central1",        
+    region: "us-central1",
     enforceAppCheck: false,
-    timeoutSeconds: 540,          
+    timeoutSeconds: 540,
     memory: "1GiB",
     secrets: [OPENAI_API_KEY],
   },
   async (request) => {
+    const t0 = Date.now();
+
     const firebaseUid = request.auth?.uid;
     const userId = request.data?.userId || firebaseUid;
     if (!userId) throw new HttpsError("permission-denied", "You must be logged in");
@@ -107,55 +114,62 @@ exports.generateWorkoutPlan = onCall(
     const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
 
     try {
-      //Load user
+      // Load user
       const userDoc = await db.collection("users").doc(userId).get();
       const userData = userDoc.data();
       if (!userData) throw new HttpsError("not-found", "User data not found");
       userData.uid = userId;
 
-      //Load exercises, filter by equipment, trim to lite list
-      const exercisesSnapshot = await db.collection("exercises").get();
-      const exercises = exercisesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      // Load exercises, filter, trim
+      const exSnap = await db.collection("exercises").get();
+      const exercises = exSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
       const eq = norm(userData.equipment);
       const filtered = eq === "None" ? exercises.filter((ex) => norm(ex.equipment) === "None") : exercises;
       const allowedLite = toAllowedLite(filtered, MAX_EX_LIBRARY);
 
-      //Dates
-      const today = dayjs();
+      // Dates in Bangkok time (fallback to local if tz fails, just in case)
+      let today;
+      try {
+        today = dayjs().tz("Asia/Bangkok");
+      } catch (tzErr) {
+        logger.warn("dayjs.tz failed; falling back to local tz", { tzErr: String(tzErr) });
+        today = dayjs();
+      }
       const startDate = today.format("YYYY-MM-DD");
       const endDate = today.add(29, "day").format("YYYY-MM-DD");
 
-      //Build prompt and call OpenAI
-      const prompt = buildPrompt({ userData, startDate, endDate, allowedLite });
+      const t1 = Date.now();
 
+      // OpenAI
+      const prompt = buildPrompt({ userData, startDate, endDate, allowedLite });
       const ai = await openai.chat.completions.create({
         model: "gpt-4o",
         temperature: 0,
         response_format: { type: "json_object" },
-        max_tokens: 3500,                     
+        max_tokens: 3500,
         messages: [{ role: "user", content: prompt }],
       });
-
       let content = ai.choices?.[0]?.message?.content || "";
       content = content.replace(/```json|```/g, "").trim();
 
-      let parsedContent;
+      let parsed;
       try {
-        parsedContent = JSON.parse(content);
+        parsed = JSON.parse(content);
       } catch (e) {
         logger.error("JSON parse error. Raw content (truncated):", content.slice(0, 1200));
         throw new HttpsError("invalid-argument", "Model returned invalid JSON. Please try again.");
       }
 
-      const monthlyPlan = parsedContent.monthlyWorkoutPlan;
+      const monthlyPlan = parsed.monthlyWorkoutPlan;
       if (!Array.isArray(monthlyPlan)) {
         throw new HttpsError("invalid-argument", "monthlyWorkoutPlan missing or invalid");
       }
 
-      //Delete ONLY present to future routines
+      const t2 = Date.now();
+
+      // Delete present→future
       const userRef = db.collection("users").doc(userId);
       const routinesRef = userRef.collection("routines");
-
       const futureSnap = await routinesRef
         .where(FieldPath.documentId(), ">=", startDate)
         .orderBy(FieldPath.documentId())
@@ -167,16 +181,12 @@ exports.generateWorkoutPlan = onCall(
         for (const d of futureSnap.docs) {
           batchDel.delete(d.ref);
           opsDel++;
-          if (opsDel === 450) {
-            await batchDel.commit();
-            batchDel = db.batch();
-            opsDel = 0;
-          }
+          if (opsDel === 450) { await batchDel.commit(); batchDel = db.batch(); opsDel = 0; }
         }
         if (opsDel) await batchDel.commit();
       }
 
-      //Write new plan
+      // Write new plan (cap per-day exercises)
       let batch = db.batch();
       let ops = 0;
 
@@ -201,16 +211,18 @@ exports.generateWorkoutPlan = onCall(
 
         batch.set(routinesRef.doc(dayId), docData, { merge: false });
         ops++;
-        if (ops === 450) {
-          await batch.commit();
-          batch = db.batch();
-          ops = 0;
-        }
+        if (ops === 450) { await batch.commit(); batch = db.batch(); ops = 0; }
       }
 
-      //Metadata
       batch.set(userRef, { updatedAt: new Date().toISOString(), isFirstPlan: false }, { merge: true });
       if (ops || true) await batch.commit();
+
+      const t3 = Date.now();
+      logger.info("timing_ms", {
+        openai: t2 - t1,
+        delete_future: t3 - t2,
+        total: t3 - t0,
+      });
 
       return {
         success: true,
@@ -220,7 +232,12 @@ exports.generateWorkoutPlan = onCall(
         endDate,
       };
     } catch (err) {
-      logger.error("❌ Error generating workout plan", err);
+      // Log with stack + code for easier debugging
+      logger.error("❌ Error generating workout plan", {
+        message: String(err?.message || err),
+        stack: err?.stack,
+        code: err?.code,
+      });
 
       const msg = String(err?.message || "");
       if (/(deadline|deadline_exceeded|504|time[ ]?out)/i.test(msg)) {
