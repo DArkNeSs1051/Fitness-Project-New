@@ -1,165 +1,241 @@
 const { defineSecret } = require("firebase-functions/params");
-const { onCall } = require("firebase-functions/v2/https");
+const { onCall, HttpsError } = require("firebase-functions/v2/https");
 const { initializeApp } = require("firebase-admin/app");
-const { getFirestore } = require("firebase-admin/firestore");
+const { getFirestore, FieldPath } = require("firebase-admin/firestore");
 const logger = require("firebase-functions/logger");
 const { OpenAI } = require("openai");
 const dayjs = require("dayjs");
 
-// Define secrets
 const OPENAI_API_KEY = defineSecret("OPENAI_API_KEY");
 
-// Initialize Firebase Admin
 initializeApp();
 const db = getFirestore();
 
-exports.generateWorkoutPlan = onCall({
-  enforceAppCheck: false,
-  timeoutSeconds: 1000,
-  secrets: [OPENAI_API_KEY],
-}, async (request) => {
-  const firebaseUid = request.auth?.uid;
-  const userId = request.data?.userId || firebaseUid;
+/** ---------------- helpers ---------------- */
+const MAX_EX_LIBRARY = 80;   // cap exercises sent to the model
+const MAX_EX_PER_DAY = 4;    // cap exercises written per day (defensive)
 
-  if (!userId) {
-    throw new Error("You must be logged in");
+const norm = (s) => String(s ?? "").trim();
+
+function toAllowedLite(exercises, cap = MAX_EX_LIBRARY) {
+  const out = [];
+  for (const ex of exercises) {
+    const name = norm(ex.name || ex.exercise);
+    if (!name) continue;
+
+    let mg = ex.muscleGroups || ex.target || [];
+    if (typeof mg === "string") mg = [mg];
+    if (!Array.isArray(mg)) mg = [];
+
+    out.push({
+      id: String(ex.id || name),
+      name,
+      muscleGroups: mg.map(norm),
+      equipment: norm(ex.equipment || "None"),
+    });
+    if (out.length >= cap) break;
   }
+  return out;
+}
 
-  const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
+function buildPrompt({ userData, startDate, endDate, allowedLite }) {
+  return `
+Create a detailed 30-day workout plan.
 
-  try {
-    const userDoc = await db.collection("users").doc(userId).get();
-    const userData = userDoc.data();
-    if (!userData) {
-      throw new Error("User data not found");
-    }
+User:
+- gender: ${userData.gender}
+- age: ${userData.age}
+- height: ${userData.height}
+- weight: ${userData.weight}
+- level: ${userData.level}
+- goal: ${userData.goal}
+- frequency_per_week: ${userData.workoutDay}
+- equipment: ${userData.equipment}
 
-    const exercisesSnapshot = await db.collection("exercises").get();
-    const exercises = exercisesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+Exercises (use ONLY from this list by exact "name"):
+${JSON.stringify(allowedLite)}  // compact, no pretty-print
 
-    const allowedExercises =
-      userData.equipment === "None"
-        ? exercises.filter((ex) => ex.equipment === "None")
-        : exercises;
+Rules:
+1) Exactly ${userData.workoutDay} sessions/week (~${userData.workoutDay * 4}-${userData.workoutDay * 5} total). Other days are "Rest Day" with empty exercises.
+2) Distribute sessions evenly; avoid back-to-back unless training 6–7 days/week.
+3) Each workout day has 3–${MAX_EX_PER_DAY} exercises targeting related muscle groups.
+4) Respect equipment limits: None=bodyweight only; Dumbbell=bodyweight or dumbbell; else=full gym allowed.
+5) Format rules:
+  - For strength/rep exercises → reps is a plain number, e.g. "12"
+  - For static/time exercises like Plank, Side Plank, Wall Sit → reps must be in mm:ss format, e.g. "00:30"
+  - Single limb exercises: the total number (e.g., '30' for 15 per leg)
+  - Rest must always be mm:ss, e.g. "01:00"
 
-    const today = dayjs();
-    const startDate = today.format("YYYY-MM-DD");
-    const endDate = today.add(29, "day").format("YYYY-MM-DD");
+Dates: "${startDate}" .. "${endDate}"
 
-    const prompt = `
-You are a professional personal trainer creating a detailed 30-day monthly workout plan for a client.
-
-🧍‍♂️ User Profile:
-- Gender: ${userData.gender}
-- Age: ${userData.age}
-- Height: ${userData.height}
-- Weight: ${userData.weight}
-- Fitness Level: ${userData.level}
-- Goal: ${userData.goal}
-- Training Frequency: ${userData.workoutDay} day(s) per week
-- Equipment Available: ${userData.equipment}
-
-🏋️‍♀️ Exercises Library:
-${JSON.stringify(allowedExercises, null, 2)}
-
-🔧 Equipment Restrictions:
-- The client has access to: **${userData.equipment}**
-${
-      userData.equipment === "None"
-        ? "- Use only bodyweight exercises. Do not include any exercise that requires equipment."
-        : userData.equipment === "Dumbbell"
-        ? "- Use only exercises that can be done with bodyweight or a dumbbell (no machines or full gym)."
-        : "- The client has access to full gym equipment. You may include bodyweight, dumbbell, barbell, cable, and machine-based exercises."
-    }
-
-🎯 Objective:
-Generate a structured 30-day workout plan (from "${startDate}" to "${endDate}") in valid JSON format.
-
-🛑 STRICT RULES:
-1. The user must **train exactly ${userData.workoutDay} day(s) per week**, totaling ${
-      userData.workoutDay * 4
-    }-${userData.workoutDay * 5} workout days.
-2. Remaining days must be titled "Rest Day" and contain an empty "exercises" array.
-3. Spread workout days evenly. Avoid 2 workout days back-to-back unless training 6-7 days/week.
-4. Each workout day should include 3 to 5 exercises that focus on the same or related muscle group(s), using the "muscleGroups" field from the Exercises Library as the target.
-5. Rotate workout types each week.
-6. Use only allowed equipment as per user profile.
-7. Avoid repeating same workout routines too often.
-8. "For reps, use these formats:
-    - Single limb exercises: just the number (e.g., '12' for 12 per leg)
-    - Bilateral exercises: the total number
-    - Time or duraion exercise : use time format (01:00 for 60 second)
-9. "For rest, use these formats: use time format (01:00 for 60 second)
-
-📦 Output Format (JSON only):
+Return JSON ONLY (no markdown, no extra text):
 {
-  "userId": "${userId}",
+  "userId": "${userData.uid || "unknown"}",
   "monthlyWorkoutPlan": [
     {
-      "day": "2025-07-01",
-      "title": "Full Body Strength",
+      "day": "YYYY-MM-DD",
+      "title": "Upper Body Strength",
       "exercises": [
-        { "id: a short unique string (can be UUID, or "ex1", "ex2", etc.),target: "Chest" exercise": "Push Up", "sets": "3", "reps": "12", "rest": "60" }
+        { "id": "ex1", "target": "Chest", "exercise": "Push Up", "sets": "3", "reps": "12", "rest": "01:00" }
       ],
       "completed": false
     },
     {
-      "day": "2025-07-02",
+      "day": "YYYY-MM-DD",
       "title": "Rest Day",
       "exercises": [],
       "completed": false
     }
   ]
 }
+`.trim();
+}
 
-📌 VERY IMPORTANT: Return ONLY raw JSON — absolutely NO markdown formatting (no triple backticks or code blocks).
-`;
+exports.generateWorkoutPlan = onCall(
+  {
+    region: "us-central1",        
+    enforceAppCheck: false,
+    timeoutSeconds: 540,          
+    memory: "1GiB",
+    secrets: [OPENAI_API_KEY],
+  },
+  async (request) => {
+    const firebaseUid = request.auth?.uid;
+    const userId = request.data?.userId || firebaseUid;
+    if (!userId) throw new HttpsError("permission-denied", "You must be logged in");
 
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o",
-      messages: [{ role: "user", content: prompt }],
-    });
+    const openai = new OpenAI({ apiKey: OPENAI_API_KEY.value() });
 
-    const content = response.choices?.[0]?.message?.content;
-    if (!content) {
-      throw new Error("No response from OpenAI");
+    try {
+      //Load user
+      const userDoc = await db.collection("users").doc(userId).get();
+      const userData = userDoc.data();
+      if (!userData) throw new HttpsError("not-found", "User data not found");
+      userData.uid = userId;
+
+      //Load exercises, filter by equipment, trim to lite list
+      const exercisesSnapshot = await db.collection("exercises").get();
+      const exercises = exercisesSnapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      const eq = norm(userData.equipment);
+      const filtered = eq === "None" ? exercises.filter((ex) => norm(ex.equipment) === "None") : exercises;
+      const allowedLite = toAllowedLite(filtered, MAX_EX_LIBRARY);
+
+      //Dates
+      const today = dayjs();
+      const startDate = today.format("YYYY-MM-DD");
+      const endDate = today.add(29, "day").format("YYYY-MM-DD");
+
+      //Build prompt and call OpenAI
+      const prompt = buildPrompt({ userData, startDate, endDate, allowedLite });
+
+      const ai = await openai.chat.completions.create({
+        model: "gpt-4o",
+        temperature: 0,
+        response_format: { type: "json_object" },
+        max_tokens: 3500,                     
+        messages: [{ role: "user", content: prompt }],
+      });
+
+      let content = ai.choices?.[0]?.message?.content || "";
+      content = content.replace(/```json|```/g, "").trim();
+
+      let parsedContent;
+      try {
+        parsedContent = JSON.parse(content);
+      } catch (e) {
+        logger.error("JSON parse error. Raw content (truncated):", content.slice(0, 1200));
+        throw new HttpsError("invalid-argument", "Model returned invalid JSON. Please try again.");
+      }
+
+      const monthlyPlan = parsedContent.monthlyWorkoutPlan;
+      if (!Array.isArray(monthlyPlan)) {
+        throw new HttpsError("invalid-argument", "monthlyWorkoutPlan missing or invalid");
+      }
+
+      //Delete ONLY present to future routines
+      const userRef = db.collection("users").doc(userId);
+      const routinesRef = userRef.collection("routines");
+
+      const futureSnap = await routinesRef
+        .where(FieldPath.documentId(), ">=", startDate)
+        .orderBy(FieldPath.documentId())
+        .get();
+
+      if (!futureSnap.empty) {
+        let batchDel = db.batch();
+        let opsDel = 0;
+        for (const d of futureSnap.docs) {
+          batchDel.delete(d.ref);
+          opsDel++;
+          if (opsDel === 450) {
+            await batchDel.commit();
+            batchDel = db.batch();
+            opsDel = 0;
+          }
+        }
+        if (opsDel) await batchDel.commit();
+      }
+
+      //Write new plan
+      let batch = db.batch();
+      let ops = 0;
+
+      for (const day of monthlyPlan) {
+        const dayId = day.day;
+        if (!dayId || dayId < startDate) continue;
+
+        const list = Array.isArray(day.exercises) ? day.exercises.slice(0, MAX_EX_PER_DAY) : [];
+
+        const docData = {
+          title: day.title || "",
+          completed: Boolean(day.completed),
+          exercises: list.map((ex, i) => ({
+            id: String(ex.id ?? `ex${i + 1}`),
+            exercise: norm(ex.exercise),
+            target: norm(ex.target),
+            sets: String(ex.sets ?? "3"),
+            reps: norm(ex.reps ?? "12"),
+            rest: norm(ex.rest ?? "01:00"),
+          })),
+        };
+
+        batch.set(routinesRef.doc(dayId), docData, { merge: false });
+        ops++;
+        if (ops === 450) {
+          await batch.commit();
+          batch = db.batch();
+          ops = 0;
+        }
+      }
+
+      //Metadata
+      batch.set(userRef, { updatedAt: new Date().toISOString(), isFirstPlan: false }, { merge: true });
+      if (ops || true) await batch.commit();
+
+      return {
+        success: true,
+        message: "Workout plan generated successfully",
+        deletedFutureCount: futureSnap.size,
+        startDate,
+        endDate,
+      };
+    } catch (err) {
+      logger.error("❌ Error generating workout plan", err);
+
+      const msg = String(err?.message || "");
+      if (/(deadline|deadline_exceeded|504|time[ ]?out)/i.test(msg)) {
+        throw new HttpsError(
+          "deadline-exceeded",
+          "The server took too long. It may have finished writing your plan—please refresh to check, or try again."
+        );
+      }
+      if (err instanceof HttpsError) throw err;
+
+      throw new HttpsError(
+        "internal",
+        "Failed to generate workout plan. Please try again.",
+        { originalMessage: msg.slice(0, 500) }
+      );
     }
-
-    const parsedContent = JSON.parse(content);
-    const monthlyPlan = parsedContent.monthlyWorkoutPlan;
-
-    const userRef = db.collection("users").doc(userId);
-    const routinesRef = userRef.collection("routines");
-
-    const batch = db.batch();
-
-    // (Optional) Clear previous routine documents
-    const existingDocs = await routinesRef.listDocuments();
-    existingDocs.forEach(doc => batch.delete(doc));
-
-    // Add new routine documents
-    monthlyPlan.forEach(day => {
-    const dayRef = routinesRef.doc(day.day);
-    batch.set(dayRef, {
-      title: day.title || "",
-      completed: day.completed || false,
-      exercises: day.exercises || [],
-    });
-  });
-    // Update user metadata
-    batch.set(userRef, {
-      updatedAt: new Date().toISOString(),
-      isFirstPlan: false,
-    }, { merge: true });
-
-    // Commit everything at once
-    await batch.commit();
-
-    return { success: true, message: "Workout plan generated successfully" };
-
-  } catch (err) {
-    logger.error("❌ Error generating workout plan", err);
-    throw new Error("Failed to generate workout plan: " + err.message);
   }
-});
-
+);

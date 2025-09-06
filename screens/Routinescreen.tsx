@@ -26,18 +26,19 @@ import DeleteConfirmationModal from "../components/Modal/DeleteConfirmationModal
 import Toast from "react-native-toast-message";
 import { shadows } from "~/utils/shadow";
 import { useExerciseStore } from '../store/useExerciseStore';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const ITEM_HEIGHT = 35;
 
-// Utility function to clean data before sending to Firestore
-const cleanFirestoreData = (obj) => {
+// clean data before sending to Firestore
+const cleanFirestoreData = (obj: any): any => {
   if (obj === null || typeof obj !== 'object') return obj ?? null;
 
   if (Array.isArray(obj)) {
     return obj.map(cleanFirestoreData).filter((item) => item !== undefined);
   }
 
-  const cleaned = {};
+  const cleaned: any = {};
   for (const key in obj) {
     if (obj[key] !== undefined) {
       cleaned[key] = cleanFirestoreData(obj[key]);
@@ -48,7 +49,6 @@ const cleanFirestoreData = (obj) => {
 };
 
 
-// Helper function to ensure exercise has all required fields
 const createSafeExercise = (exerciseFromLibrary) => {
   const timeBasedExercises = [
     'plank',
@@ -60,10 +60,8 @@ const createSafeExercise = (exerciseFromLibrary) => {
     exerciseName.includes(timeExercise)
   );
 
-  // Handle string and array for target/muscleGroups
   let target = exerciseFromLibrary.target || exerciseFromLibrary.muscleGroups || [];
   
-  // Ensure target is always an array
   if (typeof target === 'string') {
     target = [target];
   } else if (!Array.isArray(target)) {
@@ -73,7 +71,7 @@ const createSafeExercise = (exerciseFromLibrary) => {
   return {
     id: uuid.v4(),
     exercise: exerciseFromLibrary.name || exerciseFromLibrary.exercise || '',
-    target: target, // Now always an array
+    target: target,
     reps: isTimeBased ? "00:30" : (exerciseFromLibrary.reps || "12"),
     sets: exerciseFromLibrary.sets || "3",
     rest: exerciseFromLibrary.rest || "01:00",
@@ -82,7 +80,7 @@ const createSafeExercise = (exerciseFromLibrary) => {
 
 const RoutineScreen = () => {
   const { user } = useUser();
-
+  const insets = useSafeAreaInsets();
   const [showFullCalendar, setShowFullCalendar] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [selectedExerciseForEdit, setSelectedExerciseForEdit] = useState(null);
@@ -90,7 +88,6 @@ const RoutineScreen = () => {
   const [loadingRoutine, setLoadingRoutine] = useState(true);
   const [loadingExercises, setLoadingExercises] = useState(true);
   const didFetchRoutine = useRef(false);
-
   const exerciseModalRef = useRef(null);
   const editExerciseModalRef = useRef(null);
   const deleteModalRef = useRef(null);
@@ -108,6 +105,33 @@ const RoutineScreen = () => {
     setCompleted
   } = useRoutineStore();
 
+  const workoutDays = useMemo(() => {
+  const md = {};
+  const today = dayjs();
+
+  Object.entries(workouts || {}).forEach(([date, workout]) => {
+    const workoutDate = dayjs(date);
+    const hasExercises = workout && workout.exercises && workout.exercises.length > 0;
+
+    if (hasExercises) {
+      let dotColor = "#42779F"; // Default: upcoming
+
+      if (workoutDate.isBefore(today, 'day')) {
+        dotColor = workout.completed ? "#4CAF50" : "#FFA07A"; // Completed or Skipped
+      }
+
+      md[date] = {
+        marked: true,
+        dotColor,
+      };
+    }
+  });
+
+  return md;
+}, [workouts]);
+
+
+
   // Exercise store
   const exercises = useExerciseStore(state => state.exercises);
   const fetchExercises = useExerciseStore(state => state.fetchExercises);
@@ -119,17 +143,14 @@ const RoutineScreen = () => {
   }, [selectedDate, setSelectedDate]);
 
   useEffect(() => {
-    if (!user?.id) return;
-    if (didFetchRoutine.current) return;
-
+    if (!user?.id || didFetchRoutine.current) return;
     didFetchRoutine.current = true;
 
     const fetchUserRoutine = async () => {
+      setLoadingRoutine(true);
       try {
-        setLoadingRoutine(true);
         await fetchRoutineFromFirestore(user.id);
       } catch (error) {
-        console.error("Error fetching routine:", error);
         Toast.show({ type: "error", text1: "Failed to load routine" });
       } finally {
         setLoadingRoutine(false);
@@ -137,45 +158,37 @@ const RoutineScreen = () => {
     };
 
     fetchUserRoutine();
-  }, [user?.id, fetchRoutineFromFirestore]);
+  }, [user?.id]);
 
   useEffect(() => {
     const loadExercises = async () => {
       try {
         await fetchExercises();
       } catch (error) {
-        console.error("Error loading exercises:", error);
         Toast.show({ type: 'error', text1: 'Failed to load exercises' });
       } finally {
         setLoadingExercises(false);
       }
     };
     loadExercises();
-  }, [fetchExercises]);
-
-  const workoutDays = useMemo(() => {
-    const md = {};
-    Object.entries(workouts || {}).forEach(([date, workout]) => {
-      if (workout && workout.exercises && workout.exercises.length > 0) {
-        md[date] = {
-          marked: true,
-          dotColor: workout.completed ? "#4CAF50" : "#42779F"
-        };
-      }
-    });
-    return md;
-  }, [workouts]);
+  }, []);
 
   const currentWorkoutList = useMemo(() => {
-    const workout = workouts?.[selectedDate];
-    return workout?.exercises || [];
-  }, [selectedDate, workouts]);
+    return workouts?.[selectedDate]?.exercises || [];
+  }, [workouts, selectedDate]);
 
   const isWorkoutCompleted = useMemo(() => {
-    const workout = workouts?.[selectedDate];
-    return workout?.completed || false;
-  }, [selectedDate, workouts]);
+    return workouts?.[selectedDate]?.completed || false;
+  }, [workouts, selectedDate]);
 
+  const showSkippedOverlay =
+    dayjs(selectedDate).isBefore(dayjs(), 'day') &&
+    !isWorkoutCompleted &&
+    currentWorkoutList.length > 0;
+
+  const showCompletedOverlay =
+    dayjs(selectedDate).isBefore(dayjs(), 'day') &&
+    isWorkoutCompleted;
   const positions = useSharedValue({});
 
   useEffect(() => {
@@ -323,26 +336,6 @@ const RoutineScreen = () => {
     setShowFullCalendar(s => !s);
   };
 
-  // const handleCompleteWorkout = () => {
-  //   if (!user?.id) return;
-    
-  //   try {
-  //     setCompleted(user.id, !isWorkoutCompleted);
-  //     Toast.show({
-  //       type: 'success',
-  //       text1: isWorkoutCompleted ? 'Workout Marked Incomplete' : 'Workout Completed!',
-  //       text2: isWorkoutCompleted ? 'Keep going!' : 'Great job today!',
-  //     });
-  //   } catch (error) {
-  //     console.error('Error updating workout completion:', error);
-  //     Toast.show({
-  //       type: 'error',
-  //       text1: 'Error',
-  //       text2: 'Failed to update workout status. Please try again.'
-  //     });
-  //   }
-  // };
-
   const DraggableItem = ({ item }) => {
     const offsetY = useSharedValue(0);
     const isDragging = useSharedValue(false);
@@ -392,7 +385,9 @@ const RoutineScreen = () => {
               className="mr-2"
               onPress={() => {
                 setSelectedExerciseForEdit(item);
-                editExerciseModalRef.current?.present(item);
+                setTimeout(()=>{
+                  editExerciseModalRef.current?.present(item);
+                },0)
               }}
             >
               <Ionicons name="pencil" size={20} color="#84BDEA" />
@@ -400,7 +395,9 @@ const RoutineScreen = () => {
             <TouchableOpacity
               onPress={() => {
                 setSelectedExerciseForDelete(item);
-                deleteModalRef.current?.present();
+                setTimeout(()=>{
+                  deleteModalRef.current?.present();
+                },0)
               }}
             >
               <Ionicons name="trash" size={20} color="#E63946" />
@@ -478,29 +475,69 @@ const RoutineScreen = () => {
         </View>
 
         {currentWorkoutList.length > 0 ? (
-          <ScrollView
-           showsVerticalScrollIndicator={false}
-           contentContainerStyle={{ paddingBottom: 20 }} 
-           className="bg-[#315D80] rounded-lg p-3 max-h-[350]">
-            <View className="flex-row items-center pb-2 border-b border-gray-400">
-              {isEditing && <View style={{ width: 28 }} />}
-              <Text className="text-white font-bold flex-1">Exercise</Text>
-              <Text className="text-white font-bold flex-1">Target</Text>
-              <Text className="text-white font-bold flex-[0.6] text-center">Rep/Time</Text>
-              <Text className="text-white font-bold flex-[0.6] text-center">Set</Text>
-              <Text className="text-white font-bold flex-[0.6] text-center">Rest</Text>
-              {isEditing && <View style={{ width: 50 }} />}
-            </View>
-
-            {currentWorkoutList.map((item) => (
-              <DraggableItem key={item.id} item={item} />
-            ))}
-          </ScrollView>
+          <View
+            className="bg-[#315D80] rounded-lg p-3 max-h-[350]"
+          >
+              <View className="flex-row items-center pb-2 border-b border-gray-400">
+                {isEditing && <View style={{ width: 28 }} />}
+                <Text className="text-white font-bold flex-1">Exercise</Text>
+                <Text className="text-white font-bold flex-1">Target</Text>
+                <Text className="text-white font-bold flex-[0.6] text-center">Rep/Time</Text>
+                <Text className="text-white font-bold flex-[0.6] text-center">Set</Text>
+                <Text className="text-white font-bold flex-[0.6] text-center">Rest</Text>
+                {isEditing && <View style={{ width: 50 }} />}
+              </View>
+              <ScrollView showsVerticalScrollIndicator={false}>
+                {currentWorkoutList.map((item) => (
+                  <DraggableItem key={item.id} item={item} />
+                ))}
+              </ScrollView>
+          </View>         
         ) : (
           <Text className="text-white text-center mt-3 italic">
             No exercises today. Tap "Edit" to add exercises
           </Text>
         )}
+        {/* Skipped Workout Overlay */}
+          {showSkippedOverlay && (
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(112, 82, 59, 0.752)',
+              borderRadius: 8,
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 10
+            }}>
+              <View className="bg-[#fca910] p-5 rounded-[12]">
+                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>Workout not completed</Text>
+                <Text style={{ color: 'white', fontSize: 14, marginTop: 4, fontStyle: 'italic' }}>Let's stay consistent</Text>
+              </View>
+            </View>
+          )}
+
+          {showCompletedOverlay && (
+            <View style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              backgroundColor: 'rgba(39, 123, 41, 0.6)',
+              borderRadius: 8,
+              justifyContent: 'center',
+              alignItems: 'center',
+              zIndex: 10
+            }}>
+              <View className="bg-[#45b520] p-5 rounded-[12]">
+                <Text style={{ color: 'white', fontWeight: 'bold', fontSize: 18 }}>Workout completed 🎉</Text>
+                <Text style={{ color: 'white', fontSize: 14, marginTop: 4 }}>Great job! Keep it up!</Text>
+              </View>
+            </View>
+          )}
 
         {isEditing && (
           <TouchableOpacity
@@ -522,6 +559,7 @@ const RoutineScreen = () => {
         )}
 
       </View>
+      
 
       <AddExerciseModal
         ref={exerciseModalRef}

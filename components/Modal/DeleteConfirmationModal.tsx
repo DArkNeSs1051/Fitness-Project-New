@@ -3,7 +3,8 @@ import {
   Modal, 
   View, 
   Text, 
-  TouchableOpacity, 
+  TouchableOpacity,
+  TouchableWithoutFeedback, 
   StyleSheet, 
   Dimensions,
   Platform,
@@ -57,73 +58,72 @@ const DeleteConfirmationModal = forwardRef<DeleteConfirmationModalRef, Props>(
     const modalWidth = Math.min(screenDimensions.width * 0.85, 400);
 
     return (
-      <Modal 
-        visible={visible}
-        transparent={true}
-        animationType="fade"
-        statusBarTranslucent={Platform.OS === 'android'}
-        onRequestClose={handleCancel}
-        supportedOrientations={['portrait', 'landscape']}
-        hardwareAccelerated={true}
-      >
-        <View style={[
-          styles.overlay,
-          {
-            width: screenDimensions.width,
-            height: screenDimensions.height,
-          }
-        ]}>
-          <KeyboardAvoidingView 
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            style={styles.keyboardAvoid}
-          >
-            <TouchableOpacity 
-              style={styles.backdropTouchable} 
-              activeOpacity={1} 
-              onPress={handleCancel}
+      <View>
+        <Modal 
+          visible={visible}
+          transparent={true}
+          animationType="fade"
+          statusBarTranslucent={Platform.OS === 'android'}
+          onRequestClose={handleCancel}
+          supportedOrientations={['portrait', 'landscape']}
+          hardwareAccelerated={true}
+        >
+          <View style={[
+            styles.overlay,
+            {
+              width: screenDimensions.width,
+              height: screenDimensions.height,
+            }
+          ]}>
+            <KeyboardAvoidingView 
+              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+              style={styles.keyboardAvoid}
             >
-              <View style={styles.centeredView}>
-                <View style={[
-                  styles.modalContainer,
-                  {
-                    width: modalWidth,
-                    maxWidth: modalWidth,
-                  }
-                ]}>
-                  <TouchableOpacity 
-                    activeOpacity={1} 
-                    onPress={(e) => e.stopPropagation()}
-                    style={styles.modalTouchable}
-                  >
-                    <View style={styles.modalContent}>
-                      <Text style={styles.title}>Delete Exercise</Text>
-                      <Text style={styles.message}>
-                        Are you sure you want to delete this exercise?
-                      </Text>
-                      
-                      <View style={styles.buttonContainer}>
-                        <TouchableOpacity
-                          style={[styles.button, styles.cancelButton]}
-                          onPress={handleCancel}
-                        >
-                          <Text style={styles.cancelButtonText}>Cancel</Text>
-                        </TouchableOpacity>
+              <TouchableWithoutFeedback
+                style={styles.backdropTouchable} 
+                onPress={handleCancel}
+              >
+                <View style={styles.centeredView}>
+                  <View style={[
+                    styles.modalContainer,
+                    {
+                      width: modalWidth,
+                      maxWidth: modalWidth,
+                    }
+                  ]}>
+                    <View 
+                      style={styles.modalTouchable}
+                    >
+                      <View style={styles.modalContent}>
+                        <Text style={styles.title}>Delete Exercise</Text>
+                        <Text style={styles.message}>
+                          Are you sure you want to delete this exercise?
+                        </Text>
                         
-                        <TouchableOpacity
-                          style={[styles.button, styles.deleteButton]}
-                          onPress={handleConfirm}
-                        >
-                          <Text style={styles.deleteButtonText}>Delete</Text>
-                        </TouchableOpacity>
+                        <View style={styles.buttonContainer}>
+                          <TouchableOpacity
+                            style={[styles.button, styles.cancelButton]}
+                            onPress={handleCancel}
+                          >
+                            <Text style={styles.cancelButtonText}>Cancel</Text>
+                          </TouchableOpacity>
+                          
+                          <TouchableOpacity
+                            style={[styles.button, styles.deleteButton]}
+                            onPress={handleConfirm}
+                          >
+                            <Text style={styles.deleteButtonText}>Delete</Text>
+                          </TouchableOpacity>
+                        </View>
                       </View>
                     </View>
-                  </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+              </TouchableWithoutFeedback>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
+      </View>
     );
   }
 );

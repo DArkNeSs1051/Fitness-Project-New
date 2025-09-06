@@ -13,9 +13,9 @@ import {
   ActivityIndicator,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import Constants from "expo-constants";
 import { useRouter } from "expo-router";
 import DropDownPicker from "react-native-dropdown-picker";
+import * as Progress from "react-native-progress";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { httpsCallable, getFunctions } from "firebase/functions";
 import { FIRESTORE_DB, FIREBASE_APP } from "../../../firebase";
@@ -27,6 +27,7 @@ export default function GeneratePlanScreen() {
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0);
 
   const [age, setAge] = useState("");
   const [gender, setGender] = useState("");
@@ -39,13 +40,21 @@ export default function GeneratePlanScreen() {
   const [openEquipment, setOpenEquipment] = useState(false);
   const [items, setItems] = useState([
     { label: "Lose weight", value: "lose weight" },
-    { label: "Muscle gain", value: "muscle gain" },
-    { label: "Maintenance", value: "maintenance" },
+    { label: "Gain Muscle", value: "gain muscle" },
+    { label: "Maintain Weight", value: "maintain weight" },
   ]);
    const [itemsEquipment, setItemsEquipment] = useState([
     { label: "None", value: "None" },
     { label: "Dumbbell", value: "Dumbbell" },
   ]);
+
+  const getProgressText = () => {
+    if (progress < 30) return "Saving your information...";
+    if (progress < 70) return "Hang tight! We’re generating the best plan just for you...";
+    if (progress < 100) return "Finalizing...";
+    return "Done!";
+  };
+
 
   useEffect(() => {
     if (!user?.id) return;
@@ -91,21 +100,26 @@ export default function GeneratePlanScreen() {
     }
 
     setSubmitting(true);
+    setProgress(10);
 
     try {
-      const userRef = doc(FIRESTORE_DB, "users", user.id);
+      await new Promise((r) => setTimeout(r, 300)); 
+      setProgress(30);
 
-      await updateDoc(userRef, {
-        age,
-        gender,
-        weight,
-        height,
-        goal,
-        equipment
-      });
+      const userRef = doc(FIRESTORE_DB, "users", user.id);
+      await updateDoc(userRef, { age, gender, weight, height, goal, equipment });
+
+      setProgress(60);
+      await new Promise((r) => setTimeout(r, 300));
 
       const generatePlan = httpsCallable(getFunctions(FIREBASE_APP), "generateWorkoutPlan");
       await generatePlan({ userId: user.id });
+
+      setProgress(90);
+      await new Promise((r) => setTimeout(r, 300));
+
+      setProgress(100);
+      await new Promise((r) => setTimeout(r, 500));
 
       Alert.alert("Success", "Workout plan generated!");
       router.push("/workout");
@@ -114,16 +128,9 @@ export default function GeneratePlanScreen() {
       Alert.alert("Error", err.message || "Failed to generate plan");
     } finally {
       setSubmitting(false);
+      setProgress(0);
     }
   };
-
-  if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#3D80C5" />
-      </View>
-    );
-  }
 
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
@@ -227,11 +234,19 @@ export default function GeneratePlanScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Full-screen loading overlay */}
         {submitting && (
           <View style={styles.overlay}>
-            <ActivityIndicator size="large" color="#fff" />
-            <Text style={styles.overlayText}>Generating plan...</Text>
+            <Progress.Circle
+              size={200}
+              progress={progress / 100}
+              showsText={true}
+              color="#fff"
+              thickness={8}
+              borderWidth={2}
+              unfilledColor="rgba(255,255,255,0.3)"
+              textStyle={{ color: "#fff", fontWeight: "bold" }}
+            />
+            <Text className="animate-pulse text-center" style={styles.overlayText}>{getProgressText()}</Text>
           </View>
         )}
       </KeyboardAvoidingView>
@@ -245,13 +260,12 @@ const styles = StyleSheet.create({
     backgroundColor: "#84BDEA",
   },
   content: {
-    padding: Constants.statusBarHeight,
-    paddingBottom: 40,
+    padding: 40
   },
   title: {
     fontSize: 26,
     fontWeight: "bold",
-    marginBottom: 20,
+    marginBottom: 10,
     color: "#333",
     textAlign: "center",
   },
@@ -316,6 +330,7 @@ const styles = StyleSheet.create({
   },
   overlayText: {
     marginTop: 12,
+    marginHorizontal: 20,
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",

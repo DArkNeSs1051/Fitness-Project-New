@@ -14,10 +14,21 @@ import { shadows } from '~/utils/shadow';
 import { AddIntakeMacrosModal, AddIntakeMacrosModalRef } from '~/components/Modal/AddIntakeMacrosModal';
 import FoodSearchBottomSheet, { FoodSearchBottomSheetRef } from '~/components/Modal/FoodSearchBottomSheet';
 import EditNutritionPlanBottomSheet, { EditNutritionPlanBottomSheetRef } from '~/components/Modal/EditNutritionPlanBottomSheet';
+import TodayIntakeBottomSheet, {TodayIntakeBottomSheetRef} from '~/components/Modal/TodayIntakeBottomSheet';
 import { FIRESTORE_DB } from '~/firebase';
 import { FIREBASE_AUTH } from '~/firebase';
 import { doc, getDoc, setDoc, arrayUnion, updateDoc  } from 'firebase/firestore';
 import { useUser } from '@clerk/clerk-expo';
+
+type Food = {
+  name_en: string;
+  name_th: string;
+  category:string;
+  protein: number;
+  carbs: number;
+  fat: number;
+  calories: number;
+};
 
 const getLocalDateString = () => {
   const now = new Date();
@@ -45,10 +56,12 @@ const NutritionPlanScreen = () => {
   const macrosmodalRef = useRef<AddIntakeMacrosModalRef>(null);
   const foodSheetRef = useRef<FoodSearchBottomSheetRef>(null);
   const editPlanRef = useRef<EditNutritionPlanBottomSheetRef>(null);
+  const todaymodalref = useRef<TodayIntakeBottomSheetRef>(null);
 
   const openMacrosModal = () => macrosmodalRef.current?.present();
   const openSearchSheet = () => foodSheetRef.current?.present();
   const openEditSheet = () => editPlanRef.current?.present();
+  const openFoodHistorty = () => todaymodalref.current?.present(); 
 
   const loadData = async () => {
     if (!userId || !FIREBASE_AUTH.currentUser) {
@@ -232,7 +245,7 @@ const handleSaveIntake = async (
       });
     }
 
-    // Update local state as well
+    // Update local state
     setDailyProtein(newProtein);
     setDailyCarbs(newCarbs);
     setDailyFat(newFat);
@@ -284,10 +297,12 @@ const handleSaveIntake = async (
       return {
         id: `food-${Date.now()}-${food.name_en}`,
         name: food.name_en,
+        type: food.category,
         protein,
         carbs,
         fat,
         calories,
+        quantity: food.quantity,
       };
     });
 
@@ -428,10 +443,10 @@ const handleSaveIntake = async (
           </View>
           {hasPlan && (
             <View className='flex-row items-center'>
-              <TouchableOpacity className='mr-5' onPress={openEditSheet}>
+              <TouchableOpacity className='mr-5' onPress={openEditSheet} style={shadows.medium}>
                 <Text className='font-bold'>Edit Plan</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={resetDailyTotals}>
+              <TouchableOpacity onPress={resetDailyTotals} style={shadows.medium}>
                 <Ionicons name="refresh" size={24} color="#142939" />
               </TouchableOpacity>
             </View>
@@ -499,16 +514,23 @@ const handleSaveIntake = async (
               <Text className="text-white text-center font-bold">Add Food</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity onPress={openMacrosModal} className="flex-row items-center justify-center bg-[#42779F] p-3 rounded-lg mt-4 mb-10" style={shadows.large}>
+            <TouchableOpacity onPress={openMacrosModal} className="flex-row items-center justify-center bg-[#42779F] p-3 rounded-lg mt-4 mb-3" style={shadows.large}>
               <Ionicons className='mr-2' name="pencil" size={20} color="white" />
               <Text className="text-white text-center font-bold">Add manual intake</Text>
             </TouchableOpacity>
+            <View className="flex-row items-center justify-end mr-1">
+              <TouchableOpacity onPress={openFoodHistorty} className='flex-row p-2' style={shadows.medium}>
+                <Ionicons className='mr-1' name="receipt" size={20} color="#142939" />
+                <Text className="text-[#142939] font-bold">History</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         )}
 
         <AddIntakeMacrosModal ref={macrosmodalRef} onSave={handleSaveIntake} />
         <FoodSearchBottomSheet ref={foodSheetRef} onSelect={handleFoodSelect} />
         <EditNutritionPlanBottomSheet ref={editPlanRef} onUpdate={handleUpdatePlan} />
+        <TodayIntakeBottomSheet ref={todaymodalref}/>
       </View>
     </TouchableWithoutFeedback>
   );

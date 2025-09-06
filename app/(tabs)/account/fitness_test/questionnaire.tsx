@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, ScrollView, Alert } from 'react-native';
-import Constants from 'expo-constants';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
@@ -78,7 +77,7 @@ export default function FitnessLevelForm() {
       const userRef = doc(FIRESTORE_DB, "users", user.id);
       await updateDoc(userRef, { level });
       setTimeout(() => {
-        router.replace("/workout");
+        router.back();
       }, 1000);
     }
   } catch (error) {
@@ -89,7 +88,7 @@ export default function FitnessLevelForm() {
 
 
   return (
-    <View style={{ flex: 1, paddingTop: Constants.statusBarHeight, backgroundColor: '#84BDEA' }}>
+    <View style={{ flex: 1, paddingTop: 20, backgroundColor: '#84BDEA' }}>
       <TouchableOpacity style={{ marginLeft: 10, marginBottom: 10 }} onPress={() => router.back()}>
         <Ionicons name="chevron-back-outline" size={30} color="white" />
       </TouchableOpacity>

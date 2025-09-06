@@ -16,10 +16,10 @@ type UserProfile = {
   activity?: string;
   goal?: 'lose weight' | 'gain muscle' | 'maintain weight';
   workoutDay?: number;
-  // Optional fields that might be used in ProfileScreen
   username?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  equipment?: string;
 };
 
 type UserStore = {

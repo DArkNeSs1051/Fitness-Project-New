@@ -6,20 +6,22 @@ import {
   setDoc,
 } from "firebase/firestore";
 import { FIRESTORE_DB } from "../firebase";
-import { Exercise } from "../types/Type";
+import { RoutineEexercise } from "../types/Type";
 import Toast from "react-native-toast-message";
+import dayjs from "dayjs";
 
 interface RoutineStore {
-  workouts: { [date: string]: { exercises: Exercise[]; completed: boolean } };
+  workouts: { [date: string]: { exercises: RoutineEexercise[]; completed: boolean; title?: string  } };
   selectedDate: string;
   setSelectedDate: (date: string) => void;
   fetchRoutineFromFirestore: (userId: string) => Promise<void>;
   saveDayRoutine: (userId: string, date: string) => Promise<void>;
-  addExercise: (userId: string, exercise: Exercise) => void;
-  editExercise: (userId: string, exerciseId: string, updates: Partial<Exercise>) => void;
+  addExercise: (userId: string, exercise: RoutineEexercise) => void;
+  editExercise: (userId: string, exerciseId: string, updates: Partial<RoutineEexercise>) => void;
   deleteExercise: (userId: string, exerciseId: string) => void;
-  reorderExercises: (userId: string, newExercises: Exercise[]) => void;
+  reorderExercises: (userId: string, newExercises: RoutineEexercise[]) => void;
   setCompleted: (userId: string, completed: boolean) => void;
+  getCompletedDates: () => string[];
 }
 
 export const useRoutineStore = create<RoutineStore>((set, get) => ({
@@ -32,13 +34,14 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
       const routinesRef = collection(FIRESTORE_DB, "users", userId, "routines");
       const querySnapshot = await getDocs(routinesRef);
 
-      const fetchedRoutine: { [key: string]: { exercises: Exercise[], completed: boolean } } = {};
+      const fetchedRoutine: { [key: string]: { exercises: RoutineEexercise[], completed: boolean; title?: string  } } = {};
 
       querySnapshot.forEach(docSnap => {
         const data = docSnap.data();
         fetchedRoutine[docSnap.id] = {
           exercises: data.exercises || [],
-          completed: data.completed || false
+          completed: data.completed || false,
+          title: data.title || ''
         };
       });
 
@@ -63,6 +66,18 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     Toast.show({ type: "error", text1: "Failed to save routine" });
   }
 },
+
+getCompletedDates: () => {
+  const { workouts } = get();
+  return Object.entries(workouts)
+    .filter(([_, day]) => day.completed)
+    .map(([date]) => {
+      const d = dayjs(date, ['YYYY-MM-DD', 'DD/MMM/YYYY']);
+      return d.isValid() ? d.format('YYYY-MM-DD') : null;
+    })
+    .filter((date): date is string => date !== null);
+},
+
 
 
   addExercise: (userId, exercise) => {
@@ -147,7 +162,6 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     const currentWorkout = workouts[selectedDate];
     
     if (!currentWorkout) {
-      // If no workout exists for this date, create one
       set({
         workouts: {
           ...workouts,

@@ -4,20 +4,23 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useExerciseStore } from '../../store/useExerciseStore';
+import { Exercise } from '../../types/Type';
 
-const ExerciseDetail = () => {
+
+
+const ExerciseDetail: React.FC = () => {
   const router = useRouter();
   const { id } = useLocalSearchParams();
   const exerciseId = Array.isArray(id) ? id[0] : id;
 
-  const [loading, setLoading] = useState(true);
-  const [videoError, setVideoError] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(true);
-  const [showControls, setShowControls] = useState(false);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [videoError, setVideoError] = useState<boolean>(false);
+  const [isPlaying, setIsPlaying] = useState<boolean>(true);
+  const [showControls, setShowControls] = useState<boolean>(false);
 
-  const [exercise, setExercise] = useState(null);
+  const [exercise, setExercise] = useState<Exercise | null>(null);
 
-  // Get exercises from store
+  // Access exercises and fetch function from store
   const exercises = useExerciseStore((state) => state.exercises);
   const fetchExercises = useExerciseStore((state) => state.fetchExercises);
 
@@ -40,6 +43,9 @@ const ExerciseDetail = () => {
         router.back();
       } else {
         setExercise(found);
+        if (!found.videoUrl || !found.videoUrl.startsWith('http')) {
+          setVideoError(true);
+        }
       }
 
       setLoading(false);
@@ -73,7 +79,7 @@ const ExerciseDetail = () => {
     }
   }, [isPlaying, showControls]);
 
-  const handleVideoError = (error) => {
+  const handleVideoError = (error: any) => {
     console.error('Video error:', error);
     setVideoError(true);
     Alert.alert('Video Error', 'Unable to load video content');
@@ -87,6 +93,7 @@ const ExerciseDetail = () => {
       </View>
     );
   }
+
   return (
     <View className="flex-1 bg-[#84BDEA] px-2 pt-5">
       <View className="relative rounded-xl overflow-hidden bg-black">
@@ -97,9 +104,9 @@ const ExerciseDetail = () => {
               style={{ width: '100%', height: 250 }}
               allowsFullscreen={false}
               allowsPictureInPicture={false}
-              onError={handleVideoError}
               contentFit="cover"
               nativeControls={false}
+              onError={handleVideoError}
             />
             <TouchableOpacity
               onPress={togglePlayPause}
@@ -167,7 +174,7 @@ const ExerciseDetail = () => {
           <View className="mb-6">
             <Text className="text-white text-lg font-semibold mb-3">Instruction</Text>
             <View className="bg-[#2D3B50] p-4 rounded-lg">
-              {exercise.instruction.map((item, index) => (
+              {(exercise.instruction || []).map((item, index) => (
                 <Text
                   key={index}
                   className="text-white text-base leading-6"

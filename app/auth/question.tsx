@@ -23,6 +23,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback
 } from "react-native";
+import * as Progress from "react-native-progress";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import { FIRESTORE_DB } from "~/firebase";
@@ -104,9 +105,15 @@ const Question = () => {
   const [showDatePicker, setshowDatePicker] = useState(false);
   const [tempDate, setTempDate] = useState<Date>(form.birthday ?? new Date());
   const [loading, setLoading] = useState(false);
-  const [userData, setUserData] = useState<any>();
+  const [progress, setProgress] = useState(0);
   const [userId, setUserId] = useState<string>("");
-  const [exercises, setExercises] = useState<any[]>([]);
+
+  const getProgressText = () => {
+    if (progress < 30) return "Saving your information...";
+    if (progress < 70) return "Hang tight! We’re generating the best plan just for you...";
+    if (progress < 100) return "Finalizing...";
+    return "Done!";
+  };
 
   const handleDateConfirm = (selectedDate: Date) => {
     const ageYear = dayjs().diff(dayjs(selectedDate), 'year').toString();
@@ -168,7 +175,6 @@ const signIntoFirebaseWithClerk = async () => {
   const userCredential = await signInWithCustomToken(auth, token);
   console.log("✅ Firebase signInWithCustomToken completed:", userCredential.user.uid);
 
-  // ✅ Wait for Firebase Auth to be fully initialized
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => {
       reject(new Error("Firebase auth state timeout"));
@@ -188,35 +194,30 @@ const signIntoFirebaseWithClerk = async () => {
 const fetchWorkoutPlan = async () => {
   try {
     setLoading(true);
-    
-    // ✅ FIRST: Sign into Firebase and wait for completion
+    setProgress(10);
     await signIntoFirebaseWithClerk();
-    
-    // ✅ SECOND: Double-check auth state
+    setProgress(30);
+
     const auth = getAuth();
-    console.log("🔥 Firebase currentUser after auth:", auth.currentUser?.uid);
+    if (!auth.currentUser) throw new Error("Firebase user not authenticated!");
 
-    if (!auth.currentUser) {
-      throw new Error("Firebase user not authenticated after sign-in!");
-    }
-
-    // ✅ THIRD: Now safe to call the function
     const generateWorkoutPlan = httpsCallable(functions, "generateWorkoutPlan");
-    const result = await generateWorkoutPlan({
-      // You can pass form data here if needed
-      userData: form
-    });
+    const result = await generateWorkoutPlan({ userData: form });
 
     console.log("✅ Workout plan result:", result.data);
+    setProgress(100);
+    await new Promise(r => setTimeout(r, 500));
     router.replace("/workout");
-    
+
   } catch (error) {
     console.error("❌ Error generating workout plan:", error);
     alert("เกิดข้อผิดพลาดในการสร้างแผนออกกำลังกาย");
   } finally {
     setLoading(false);
+    setProgress(0);
   }
 };
+
 
 const upDateUser = async () => {
   if (!user?.id) {
@@ -253,7 +254,6 @@ const upDateUser = async () => {
       await setDoc(userRef, updatedData, { merge: true });
       console.log("✅ User data updated successfully");
       
-      // ✅ Wait a moment for Firestore to sync, then generate workout plan
       await new Promise(resolve => setTimeout(resolve, 1000));
       await fetchWorkoutPlan();
       
@@ -312,14 +312,13 @@ const upDateUser = async () => {
       newErrors.weight = /^\d+$/.test(form.weight) ? "" : "กรุณากรอกน้ำหนัก";
       newErrors.height = /^\d+$/.test(form.height) ? "" : "กรุณากรอกส่วนสูง";
     } else if (states === 2) {
-      // Add validation for other states if needed
+
     }
 
     setErrors(newErrors);
     return Object.values(newErrors).every((err) => err === "");
   };
 
-  // Check user authentication status on mount
   useEffect(() => {
     if (user?.id) {
       console.log("✅ User authenticated:", user.id);
@@ -329,15 +328,24 @@ const upDateUser = async () => {
     }
   }, [user?.id]);
 
-  // Debug: Log when loading state changes
   useEffect(() => {
     console.log("Loading state:", loading);
   }, [loading]);
 
   return loading ? (
-    <View className="flex flex-1 justify-center items-center gap-10 bg-[#84BDEA]">
-      <Text className="text-black animate-pulse text-[20px]">
-        ⏳ กำลังสร้างแผนการออกกำลังกาย
+    <View className="flex flex-1 justify-center items-center gap-6 bg-[#84BDEA]">
+      <Progress.Circle
+        size={200}
+        progress={progress / 100}
+        showsText
+        color="#ffffff"
+        thickness={8}
+        borderWidth={2}
+        unfilledColor="rgba(255, 255, 255, 0.3)"
+        textStyle={{ color: "#fff", fontWeight: "bold" }}
+      />
+      <Text className="text-white animate-pulse text-[16px] text-center font-semibold px-8">
+        {getProgressText()}
       </Text>
     </View>
   ) : (

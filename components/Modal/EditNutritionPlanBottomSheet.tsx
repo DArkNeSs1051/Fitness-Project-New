@@ -1,10 +1,8 @@
 import React, {
-  useCallback,
   useImperativeHandle,
   forwardRef,
   useRef,
   useState,
-  useEffect,
 } from 'react';
 import {
   View,
@@ -87,10 +85,7 @@ const EditNutritionPlanBottomSheet = forwardRef<EditNutritionPlanBottomSheetRef,
     useImperativeHandle(ref, () => ({
       present: async () => {
         if (userId) {
-          // Call the Firestore fetch function
           await loadUserData(userId);
-
-          // Access fresh store data directly from Zustand
           const latest = useUserStore.getState().user;
 
           if (latest) {
@@ -106,7 +101,6 @@ const EditNutritionPlanBottomSheet = forwardRef<EditNutritionPlanBottomSheetRef,
           }
         }
 
-        // Open the bottom sheet
         bottomSheetRef.current?.present();
       },
       dismiss: () => bottomSheetRef.current?.dismiss(),
@@ -139,7 +133,7 @@ const EditNutritionPlanBottomSheet = forwardRef<EditNutritionPlanBottomSheetRef,
         // Save nutrition plan
         await setDoc(doc(FIRESTORE_DB, 'users', userId, 'nutrition', 'plan'), payload);
 
-        // Save user profile (merge avoids overwriting other user fields)
+        // Save user profile
         await setDoc(
           doc(FIRESTORE_DB, 'users', userId),
           {
@@ -156,13 +150,10 @@ const EditNutritionPlanBottomSheet = forwardRef<EditNutritionPlanBottomSheetRef,
         );
         await AsyncStorage.setItem('nutritionGoals', JSON.stringify(result));
 
-        // Update Zustand
         setUserData(userData);
 
-        // Update parent
         onUpdate(result.adjustedTdee, result.protein, result.carbs, result.fat);
 
-        // Close sheet
         bottomSheetRef.current?.dismiss();
       } catch (err) {
         console.error('Failed to save:', err);
