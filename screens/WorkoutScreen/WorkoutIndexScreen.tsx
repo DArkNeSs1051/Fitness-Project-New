@@ -121,7 +121,6 @@ const WorkoutIndexScreen: React.FC = () => {
       },
     });
   };
-  console.log("data:", data);
 
   const todayId = new Date().toISOString().slice(0, 10); // "2025-08-03"
 
