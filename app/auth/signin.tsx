@@ -2,15 +2,19 @@ import { useAuth, useOAuth, useSignIn, useUser } from "@clerk/clerk-expo";
 import dayjs from "dayjs";
 import * as Linking from "expo-linking";
 import { useRouter } from "expo-router";
+import {
+  getAuth,
+  onAuthStateChanged,
+  signInWithCustomToken,
+} from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import {  getAuth, signInWithCustomToken, onAuthStateChanged } from "firebase/auth";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Image, Text, View } from "react-native";
 import { twMerge } from "tailwind-merge";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import TextInputCustom from "~/components/BBComponents/TextInputCustom";
 import GmailiconColor from "../../assets/images/Image/GmailiconColor.svg";
-import { FIRESTORE_DB, FIREBASE_AUTH } from "../../firebase";
+import { FIRESTORE_DB } from "../../firebase";
 
 const SignIn = () => {
   const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
@@ -21,7 +25,8 @@ const SignIn = () => {
     emailAddress: "",
     password: "",
   });
-  const [isFirebaseAuthenticating, setIsFirebaseAuthenticating] = useState(false);
+  const [isFirebaseAuthenticating, setIsFirebaseAuthenticating] =
+    useState(false);
 
   const onChangeForm = (key: string, value: string) => {
     setForm({ ...form, [key]: value });
@@ -37,29 +42,28 @@ const SignIn = () => {
 
   // Sign into Firebase with Clerk custom token and wait for Firebase auth state
   const signIntoFirebaseWithClerk = async () => {
-  const token = await getToken({ template: "integration_firebase" });
-  if (!token) throw new Error("No Clerk token");
+    const token = await getToken({ template: "integration_firebase" });
+    if (!token) throw new Error("No Clerk token");
 
-  const auth = getAuth();
-  await signInWithCustomToken(auth, token);
+    const auth = getAuth();
+    await signInWithCustomToken(auth, token);
 
-  await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject("Firebase auth timeout"), 5000);
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        clearTimeout(timeout);
-        unsubscribe();
-        console.log("✅ Firebase auth state confirmed:", user.uid);
-        resolve(true);
-      }
+    await new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => reject("Firebase auth timeout"), 5000);
+      const unsubscribe = onAuthStateChanged(auth, (user) => {
+        if (user) {
+          clearTimeout(timeout);
+          unsubscribe();
+          console.log("✅ Firebase auth state confirmed:", user.uid);
+          resolve(true);
+        }
+      });
     });
-  });
 
-  // ✅ PUT THIS HERE
-  const firebaseIdToken = await auth.currentUser?.getIdToken();
-  console.log("✅ Firebase ID Token:", firebaseIdToken);
-};
-
+    // ✅ PUT THIS HERE
+    const firebaseIdToken = await auth.currentUser?.getIdToken();
+    console.log("✅ Firebase ID Token:", firebaseIdToken);
+  };
 
   // This effect listens for Clerk auth ready & signed in user
   // Then performs Firebase sign-in and user doc creation
@@ -72,7 +76,9 @@ const SignIn = () => {
           // Sign into Firebase with Clerk token
           await signIntoFirebaseWithClerk();
 
-          console.log("✅ Firebase authentication completed, checking user document...");
+          console.log(
+            "✅ Firebase authentication completed, checking user document..."
+          );
 
           // Access Firestore user document
           const userRef = doc(FIRESTORE_DB, "users", userId);
@@ -81,7 +87,9 @@ const SignIn = () => {
           if (userDocSnap.exists()) {
             console.log("✅ Found user in Firestore:", userDocSnap.data());
           } else {
-            console.log("❌ User not found in Firestore, creating new document");
+            console.log(
+              "❌ User not found in Firestore, creating new document"
+            );
 
             await setDoc(userRef, {
               email: user?.primaryEmailAddress?.emailAddress || "",
