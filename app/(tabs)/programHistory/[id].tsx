@@ -3,7 +3,7 @@ import WorkoutDetailScreen from "../../../screens/WorkoutScreen/WorkoutDetailScr
 
 export default function WorkoutDetailPage() {
   const { id } = useLocalSearchParams();
-  const workoutId = Array.isArray(id) ? id[0] : id || ""; // ✅ Ensure it's a string
+  const workoutId = Array.isArray(id) ? id[0] : id || ""; 
 
   return <WorkoutDetailScreen workoutId={workoutId} />;
 }

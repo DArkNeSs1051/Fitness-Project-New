@@ -4,8 +4,6 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { shadows } from "~/utils/shadow";
 import { useClerk, useUser } from "@clerk/clerk-expo";
-import { useUserStore } from '~/store/useUserStore';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function AccountScreen() {
   const { user } = useUser();

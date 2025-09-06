@@ -5,9 +5,14 @@ import { useRouter } from "expo-router";
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEventListener } from 'expo';
 import Animated, { FadeIn, FadeOut } from "react-native-reanimated";
-import { useExerciseStore } from '../store/useExerciseStore'; 
+import { useExerciseStore } from '../store/useExerciseStore';
 
 type Category = 'all' | 'upper' | 'lower' | 'core' | 'cardio';
+
+interface VideoThumbnailProps {
+  exercise: any; 
+  onPress: () => void;
+}
 
 const categories = [
   { id: 'all', name: 'All' },
@@ -21,7 +26,8 @@ const muscles = ['Chest', 'Back', 'Arms', 'Legs', 'Core'];
 const equipmentList = ['None', 'Barbell', 'Dumbbell', 'Machine'];
 const level = ['Beginner', 'Intermediate', 'Advanced'];
 
-const VideoThumbnail = ({ exercise, onPress }) => {
+
+const VideoThumbnail = ({ exercise, onPress }:VideoThumbnailProps) => {
   const [showVideo, setShowVideo] = useState(false);
   const player = useVideoPlayer(exercise.videoUrl || '', (player) => {
     player.muted = true;
@@ -136,7 +142,7 @@ const LibraryScreen = () => {
     setFilterVisible(!filterVisible);
   };
 
-  const handleFilterButtonLayout = (event) => {
+  const handleFilterButtonLayout = (event:any) => {
     const { y, height } = event.nativeEvent.layout;
     setFilterButtonLayout({ y, height });
   };
@@ -146,18 +152,19 @@ const LibraryScreen = () => {
   };
 
   const filteredExercises = exercises.filter(exercise => {
-    const matchesCategory = selectedCategory === 'all' || exercise.category === selectedCategory;
-    const matchesMuscle = selectedMuscles.length === 0 || selectedMuscles.some(m => exercise.muscleGroups?.includes(m));
-    const matchesEquipment = selectedEquipment.length === 0 || selectedEquipment.includes(exercise.equipment);
-    const matchesLevel = selectedLevel.length === 0 || selectedLevel.includes(exercise.difficulty);
-    const matchesSearch =
-      searchQuery === '' ||
-      exercise.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (exercise.muscleGroups || []).some(muscle => muscle.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      exercise.equipment?.toLowerCase().includes(searchQuery.toLowerCase());
+  const matchesCategory = selectedCategory === 'all' || exercise.category === selectedCategory;
+  const matchesMuscle = selectedMuscles.length === 0 || selectedMuscles.some(m => exercise.muscleGroups?.includes(m));
+  const matchesEquipment = selectedEquipment.length === 0 || selectedEquipment.includes(exercise.equipment || '');
+  const matchesLevel = selectedLevel.length === 0 || selectedLevel.includes(exercise.difficulty || '');
+  const matchesSearch =
+    searchQuery === '' ||
+    exercise.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (exercise.muscleGroups || []).some(muscle => muscle.toLowerCase().includes(searchQuery.toLowerCase())) ||
+    (exercise.equipment ?? '').toLowerCase().includes(searchQuery.toLowerCase());
 
-    return matchesCategory && matchesMuscle && matchesEquipment && matchesLevel && matchesSearch;
-  });
+  return matchesCategory && matchesMuscle && matchesEquipment && matchesLevel && matchesSearch;
+});
+
 
   return (
     <View className="flex-1 py-4 bg-[#84BDEA]">

@@ -19,7 +19,7 @@ export interface Exercise {
   reps: number;
   sets: number;
   rest: string;
-  muscleGroups: string;
+  muscleGroups: string[];
   equipment: string;
 }
 
@@ -98,7 +98,6 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
           <Text style={styles.filterTitle}>Equipment</Text>
           {renderFilterChips(equipmentTypes, selectedEquipment, setSelectedEquipment)}
 
-          {/* Now just map exercises without FlatList */}
           {filteredExercises.map((item) => (
             <TouchableOpacity
               key={item.id}
@@ -124,7 +123,6 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
 const styles = StyleSheet.create({
   container: {
     padding: 16,
-    // flexGrow is important to allow scroll
     flexGrow: 1,
   },
   title: {

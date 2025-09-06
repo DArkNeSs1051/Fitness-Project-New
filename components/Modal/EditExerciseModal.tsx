@@ -43,7 +43,7 @@ const ITEM_HEIGHT = 40;
 const VISIBLE_ITEMS = 3;
 const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 
-// function to check if an exercise uses time format (like plank)
+// Check if an exercise uses time format
 const isTimeBasedExercise = (exerciseName: string): boolean => {
   const timeBasedExercises = ['plank', 'wall sit', 'hold', 'static'];
   return timeBasedExercises.some(keyword => 
@@ -51,7 +51,7 @@ const isTimeBasedExercise = (exerciseName: string): boolean => {
   );
 };
 
-// function to parse time string (MM:SS) to total seconds
+// Parse time string (MM:SS) to total seconds
 const parseTimeToSeconds = (timeStr: string): { minutes: number; seconds: number } => {
   if (typeof timeStr !== 'string' || !timeStr.includes(':')) {
     return { minutes: 0, seconds: 0 };
@@ -64,7 +64,7 @@ const parseTimeToSeconds = (timeStr: string): { minutes: number; seconds: number
   return { minutes, seconds };
 };
 
-// function to format time from minutes and seconds
+// Format time from minutes and seconds
 const formatTime = (minutes: number, seconds: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
@@ -83,7 +83,6 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
     const [isModalVisible, setIsModalVisible] = useState(false);
     const [isTimeBased, setIsTimeBased] = useState(false);
 
-    // Arrays
     const repsArray = useMemo(() => Array.from({ length: 31 }, (_, i) => i+1), []);
     const setsArray = useMemo(() => Array.from({ length: 10 }, (_, i) => i + 1), []);
     const minutesArray = useMemo(() => Array.from({ length: 11 }, (_, i) => i), []);
@@ -150,12 +149,10 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
         setSelectedSecond(validSecond);
         
         if (timeBasedExercise) {
-          // Parse reps as time format
           const { minutes, seconds } = parseTimeToSeconds(String(ex.reps));
           setSelectedTimeMinute(minutes);
           setSelectedTimeSecond(seconds);
         } else {
-          // Parse reps as number
           const repsValue = typeof ex.reps === 'number' ? ex.reps : parseInt(String(ex.reps)) || 1;
           setSelectedReps(Math.min(Math.max(repsValue, 1), 30));
         }
@@ -497,7 +494,7 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     color: '#5FA3D6',
     alignSelf: 'center',
-    marginTop: 20, // Adjust to align with picker items
+    marginTop: 20, 
   },
   selectionIndicator: {
     position: 'absolute',
@@ -520,7 +517,7 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   selectedPickerItem: {
-    // Remove background since we have the indicator
+ 
   },
   pickerText: {
     fontSize: 18,

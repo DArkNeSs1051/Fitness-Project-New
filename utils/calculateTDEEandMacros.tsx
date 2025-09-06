@@ -8,9 +8,9 @@ export type ActivityLevel =
 
 interface UserInput {
   gender: string;
-  weight: number; // in kg
-  height: number; // in cm
-  age: number; // in years
+  weight: number; 
+  height: number; 
+  age: number; 
   activity: ActivityLevel;
   goal: string;
 }
@@ -18,21 +18,21 @@ interface UserInput {
 interface MacroResult {
   tdee: number;
   adjustedTdee: number;
-  protein: number; // in grams
-  fat: number; // in grams
-  carbs: number; // in grams
+  protein: number; 
+  fat: number; 
+  carbs: number; 
 }
 
 export function calculateTDEEAndMacros(user: UserInput): MacroResult {
   const { gender, weight, height, age, activity, goal } = user;
 
-  // 1. Calculate BMR
+  // Calculate BMR
   let BMR =
     gender === 'male'
-      ? (13.7 * weight) + (5 * height) - (8 * age) + 66
+      ? (13.7 * weight) + (5 * height) - (6.8 * age) + 66
       : (9.6 * weight) + (8 * height) - (4.7 * age) + 655;
 
-  // 2. Apply activity multiplier
+  // Apply activity multiplier
   const activityMultipliers: Record<ActivityLevel, number> = {
     'sedentary': 1.2,
     'lightly active': 1.375,
@@ -43,12 +43,12 @@ export function calculateTDEEAndMacros(user: UserInput): MacroResult {
 
   const TDEE = BMR * (activityMultipliers[activity] || 1.2);
 
-  // 3. Adjust TDEE based on goal
+  // Adjust TDEE based on goal
   let adjustedTdee = TDEE;
-  if (goal === 'lose weight') adjustedTdee -= 200;
+  if (goal === 'lose weight') adjustedTdee -= 500;
   else if (goal === 'gain muscle') adjustedTdee += 300;
 
-  // 4. Macronutrient distribution
+  // Macronutrient distribution
   // Protein per kg
   const proteinPerKg =
     goal === 'gain muscle' ? 2.2 : goal === 'lose weight' ? 2.0 : 1.8;

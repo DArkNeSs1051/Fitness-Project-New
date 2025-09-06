@@ -18,6 +18,7 @@ import { ProgressSection } from "~/components/ProgressSection";
 import { FIREBASE_STORE, FIRESTORE_DB } from "~/firebase";
 import { shadows } from "~/utils/shadow";
 import { Card } from "../../components/ui/card";
+import { useRoutineStore } from "~/store/useRoutineStore";
 
 // Define workout type
 interface WorkoutDay {
@@ -25,7 +26,7 @@ interface WorkoutDay {
   title: string;
   day: string;
   targetMuscles: string;
-  image: any; // In a real app, you would use proper typing
+  image: any;
 }
 
 export type TExercise = {
@@ -44,6 +45,17 @@ export interface IRoutines {
   exercises: TExercise[];
   completed: boolean;
 }
+
+
+import utc from "dayjs/plugin/utc";
+import timezone from "dayjs/plugin/timezone";
+
+dayjs.extend(utc);
+dayjs.extend(timezone);
+
+dayjs.tz.setDefault("Asia/Bangkok"); // 👈 now every dayjs() will use Bangkok
+
+
 
 const WorkoutIndexScreen: React.FC = () => {
   const { user } = useUser();
@@ -122,7 +134,7 @@ const WorkoutIndexScreen: React.FC = () => {
     });
   };
 
-  const todayId = new Date().toISOString().slice(0, 10); // "2025-08-03"
+const todayId = dayjs().format("YYYY-MM-DD");
 
   const todayWorkout = data.find((item) => item.id === todayId);
 
@@ -168,14 +180,14 @@ const WorkoutIndexScreen: React.FC = () => {
                     )}
                     <View className="absolute inset-0 bg-black/30" />
 
-                    {/* Workout title */}
+                    {/* Title */}
                     <View className="absolute left-4 top-4">
                       <Text className="text-white text-xl font-bold">
                         {todayWorkout.title}
                       </Text>
                     </View>
 
-                    {/* Workout day */}
+                    {/* Day */}
                     <View className="absolute left-4 bottom-1">
                       <Text className="text-white text-base">
                         {day} {""}
@@ -184,7 +196,7 @@ const WorkoutIndexScreen: React.FC = () => {
                     </View>
                   </View>
 
-                  {/* Target muscles */}
+                  {/* Muscles */}
                   <View className="flex-row items-center px-4 py-2 bg-gray-800 rounded-b-xl">
                     <Ionicons name="body" size={16} color="white" />
                     <Text className="text-white ml-2 text-sm">
@@ -203,15 +215,7 @@ const WorkoutIndexScreen: React.FC = () => {
           </View>
         </View>
       </View>
-      <ProgressSection
-        workoutsThisWeek={[
-          { day: "Mon", completed: true },
-          { day: "Tue", completed: false },
-          { day: "Wed", completed: true },
-          { day: "Thu", completed: true },
-          { day: "Fri", completed: false },
-        ]}
-      />
+      <ProgressSection />
     </SafeAreaView>
   );
 };
