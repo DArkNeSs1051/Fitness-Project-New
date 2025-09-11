@@ -12,7 +12,7 @@ import {
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
 import OpenAI from "openai";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
   Modal,
@@ -42,6 +42,9 @@ import HomePreferIconWhite from "../../assets/images/Image/HomePreferIconWhite.s
 import MaleIcon from "../../assets/images/Image/Maleicon.svg";
 import MaleIconWhite from "../../assets/images/Image/MaleIconWhite.svg";
 import Workout from "../../assets/images/Image/Workout.svg";
+import { shadows } from "~/utils/shadow";
+import FitnessTestScreen from "../(tabs)/account/fitnessTest";
+import { useFitnessFormStore } from "~/store/useFitnessFormStore";
 
 const classes = {
   title: twMerge("text-3xl font-bold text-[#142939]"),
@@ -59,7 +62,7 @@ const classes = {
   ),
 };
 
-interface formInterface {
+export interface formInterface {
   gender: string;
   age: string;
   birthday: Date | null;
@@ -73,29 +76,35 @@ interface formInterface {
   activity: string;
   updatedAt: string;
   workoutDay: number;
+  index: number;
 }
 
 const client = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 const Question = () => {
   const { user } = useUser();
-  const [states, setStates] = useState(1);
+  const form = useFitnessFormStore((state) => state.form);
+  const setForm = useFitnessFormStore((state) => state.setForm);
+
+  // const [form, setForm] = useState<formInterface>({
+  //   gender: "",
+  //   age: "0",
+  //   birthday: null,
+  //   weight: "",
+  //   weightUnit: "kg",
+  //   height: "",
+  //   heightUnit: "cm",
+  //   level: "beginner",
+  //   goal: "lose weight",
+  //   equipment: "None",
+  //   activity: "sedentary",
+  //   updatedAt: "",
+  //   workoutDay: 1,
+  //   index: 1,
+  // });
+  const [states, setStates] = useState(form.index);
+
   const maxStates = 6;
-  const [form, setForm] = useState<formInterface>({
-    gender: "",
-    age: "0",
-    birthday: null,
-    weight: "",
-    weightUnit: "kg",
-    height: "",
-    heightUnit: "cm",
-    level: "beginner",
-    goal: "lose weight",
-    equipment: "None",
-    activity: "sedentary",
-    updatedAt: "",
-    workoutDay: 1,
-  });
 
   const [errors, setErrors] = useState({
     gender: "",
@@ -112,14 +121,15 @@ const Question = () => {
 
   const getProgressText = () => {
     if (progress < 30) return "Saving your information...";
-    if (progress < 70) return "Hang tight! We’re generating the best plan just for you...";
+    if (progress < 70)
+      return "Hang tight! We’re generating the best plan just for you...";
     if (progress < 100) return "Finalizing...";
     return "Done!";
   };
 
   const handleDateConfirm = (selectedDate: Date) => {
     const ageYear = dayjs().diff(dayjs(selectedDate), "year").toString();
-    setForm((prev) => ({
+    setForm((prev: any) => ({
       ...prev,
       birthday: selectedDate,
       age: ageYear,
@@ -132,7 +142,7 @@ const Question = () => {
   };
 
   const onChangeForm = (key: string, value: string | number) => {
-    setForm((prev) => ({ ...prev, [key]: value }));
+    setForm((prev: any) => ({ ...prev, [key]: value }));
 
     setErrors((prev) => {
       const newErrors = { ...prev };
@@ -173,52 +183,59 @@ const Question = () => {
 
     if (!token) throw new Error("No Clerk token");
 
-  const auth = getAuth();
-  const userCredential = await signInWithCustomToken(auth, token);
-  console.log("✅ Firebase signInWithCustomToken completed:", userCredential.user.uid);
-
-  return new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => {
-      reject(new Error("Firebase auth state timeout"));
-    }, 5000);
-
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      if (firebaseUser && firebaseUser.uid === userCredential.user.uid) {
-        clearTimeout(timeout);
-        unsubscribe();
-        console.log("✅ Firebase auth state confirmed:", firebaseUser.uid);
-        resolve(firebaseUser);
-      }
-    });
-  });
-};
-
-const fetchWorkoutPlan = async () => {
-  try {
-    setLoading(true);
-    setProgress(10);
-    await signIntoFirebaseWithClerk();
-    setProgress(30);
-
     const auth = getAuth();
-    if (!auth.currentUser) throw new Error("Firebase user not authenticated!");
+    const userCredential = await signInWithCustomToken(auth, token);
+    console.log(
+      "✅ Firebase signInWithCustomToken completed:",
+      userCredential.user.uid
+    );
 
-    const generateWorkoutPlan = httpsCallable(functions, "generateWorkoutPlan");
-    const result = await generateWorkoutPlan({ userData: form });
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("Firebase auth state timeout"));
+      }, 5000);
 
-    console.log("✅ Workout plan result:", result.data);
-    setProgress(100);
-    await new Promise(r => setTimeout(r, 500));
-    router.replace("/workout");
+      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+        if (firebaseUser && firebaseUser.uid === userCredential.user.uid) {
+          clearTimeout(timeout);
+          unsubscribe();
+          console.log("✅ Firebase auth state confirmed:", firebaseUser.uid);
+          resolve(firebaseUser);
+        }
+      });
+    });
+  };
 
-  } catch (error) {
-    console.error("❌ Error generating workout plan:", error);
-    alert("เกิดข้อผิดพลาดในการสร้างแผนออกกำลังกาย");
-  } finally {
-    setLoading(false);
-    setProgress(0);
-  }
-};
+  const fetchWorkoutPlan = async () => {
+    try {
+      setLoading(true);
+      setProgress(10);
+      await signIntoFirebaseWithClerk();
+      setProgress(30);
+
+      const auth = getAuth();
+      console.log("auth:", auth);
+      if (!auth.currentUser)
+        throw new Error("Firebase user not authenticated!");
+
+      const generateWorkoutPlan = httpsCallable(
+        functions,
+        "generateWorkoutPlan"
+      );
+      const result = await generateWorkoutPlan({ userData: form });
+
+      console.log("✅ Workout plan result:", result.data);
+      setProgress(100);
+      await new Promise((r) => setTimeout(r, 500));
+      router.replace("/workout");
+    } catch (error) {
+      console.error("❌ Error generating workout plan:", error);
+      alert("เกิดข้อผิดพลาดในการสร้างแผนออกกำลังกาย");
+    } finally {
+      setLoading(false);
+      setProgress(0);
+    }
+  };
 
   const upDateUser = async () => {
     if (!user?.id) {
@@ -313,7 +330,6 @@ const fetchWorkoutPlan = async () => {
       newErrors.weight = /^\d+$/.test(form.weight) ? "" : "กรุณากรอกน้ำหนัก";
       newErrors.height = /^\d+$/.test(form.height) ? "" : "กรุณากรอกส่วนสูง";
     } else if (states === 2) {
-
     }
 
     setErrors(newErrors);
@@ -627,94 +643,96 @@ const fetchWorkoutPlan = async () => {
         )}
         {/* States 2 */}
         {states === 2 && (
-          <View className={classes.container}>
-            <View className="flex flex-col gap-1">
-              <Text className={classes.title}>What level are you in ?</Text>
-            </View>
-            <View className="flex flex-col gap-5">
-              <Text className={classes.text}>Select your level</Text>
-              <View className="flex flex-col gap-10 items-center justify-center pt-10">
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.level === "beginner" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("level", "beginner")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.level === "beginner" && "text-[#FDFDFF]"
-                      )}
-                    >
-                      Beginner
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.level === "beginner" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.level === "intermediate" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("level", "intermediate")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.level === "intermediate" && "text-[#FDFDFF]"
-                      )}
-                    >
-                      Intermediate
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.level === "intermediate" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.level === "advance" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("level", "advance")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.level === "advance" && "text-[#FDFDFF]"
-                      )}
-                    >
-                      Advance
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.level === "advance" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
+          // <View className={classes.container}>
+          //   <View className="flex flex-col gap-1">
+          //     <Text className={classes.title}>What level are you in ?</Text>
+          //   </View>
+
+          //   <View className="flex flex-col gap-5">
+          //     <Text className={classes.text}>Select your level</Text>
+          //     <View className="flex flex-col gap-10 items-center justify-center pt-10">
+          //       <View className="h-[60px]">
+          //         <TouchableOpacity
+          //           activeOpacity={1}
+          //           className={twMerge(
+          //             classes.boxRounded2,
+          //             form.level === "beginner" && "border-[#FDFDFF]"
+          //           )}
+          //           onPress={() => onChangeForm("level", "beginner")}
+          //         >
+          //           <Text
+          //             className={twMerge(
+          //               classes.text,
+          //               form.level === "beginner" && "text-[#FDFDFF]"
+          //             )}
+          //           >
+          //             Beginner
+          //           </Text>
+          //           <View
+          //             className={twMerge(
+          //               classes.rounded,
+          //               form.level === "beginner" &&
+          //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+          //             )}
+          //           ></View>
+          //         </TouchableOpacity>
+          //       </View>
+          //       <View className="h-[60px]">
+          //         <TouchableOpacity
+          //           activeOpacity={1}
+          //           className={twMerge(
+          //             classes.boxRounded2,
+          //             form.level === "intermediate" && "border-[#FDFDFF]"
+          //           )}
+          //           onPress={() => onChangeForm("level", "intermediate")}
+          //         >
+          //           <Text
+          //             className={twMerge(
+          //               classes.text,
+          //               form.level === "intermediate" && "text-[#FDFDFF]"
+          //             )}
+          //           >
+          //             Intermediate
+          //           </Text>
+          //           <View
+          //             className={twMerge(
+          //               classes.rounded,
+          //               form.level === "intermediate" &&
+          //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+          //             )}
+          //           ></View>
+          //         </TouchableOpacity>
+          //       </View>
+          //       <View className="h-[60px]">
+          //         <TouchableOpacity
+          //           activeOpacity={1}
+          //           className={twMerge(
+          //             classes.boxRounded2,
+          //             form.level === "advance" && "border-[#FDFDFF]"
+          //           )}
+          //           onPress={() => onChangeForm("level", "advance")}
+          //         >
+          //           <Text
+          //             className={twMerge(
+          //               classes.text,
+          //               form.level === "advance" && "text-[#FDFDFF]"
+          //             )}
+          //           >
+          //             Advance
+          //           </Text>
+          //           <View
+          //             className={twMerge(
+          //               classes.rounded,
+          //               form.level === "advance" &&
+          //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+          //             )}
+          //           ></View>
+          //         </TouchableOpacity>
+          //       </View>
+          //     </View>
+          //   </View>
+          // </View>
+          <FitnessTestScreen onHideArrow form={form} />
         )}
         {/* States 3 */}
         {states === 3 && (
