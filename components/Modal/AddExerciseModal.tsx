@@ -1,36 +1,47 @@
 import React, { useRef, useMemo, useState, forwardRef, useImperativeHandle } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-} from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomSheetModal, BottomSheetBackdrop, BottomSheetScrollView } from '@gorhom/bottom-sheet';
+import { ExerciseFromLibrary } from '~/types/Type'; 
 
-const muscle = ['Chest', 'Back', 'Arms', 'Legs', 'Core', 'Shoulders'];
-const equipmentTypes = ['None', 'Dumbbell', 'Barbell', 'Machine'];
+const muscle = ['Chest', 'Back', 'Arms', 'Legs', 'Core', 'Shoulders','Full Body'];
+const equipmentTypes = ['None', 'Dumbbell'];
 
-export interface Exercise {
+
+export type RoutineExercise = {
   id: string;
-  name: string;
   exercise: string;
-  target: string;
-  reps: number;
-  sets: number;
-  rest: string;
-  muscleGroups: string[];
-  equipment: string;
-}
+  target: string[];  
+  reps: string;      
+  sets: string;      
+  rest: string;      
+  equipment?: string;
+};
 
 export interface AddExerciseModalRef {
   present: () => void;
   dismiss: () => void;
 }
 
-interface Props {
-  onSelectExercise: (exercise: Exercise) => void;
-  availableExercises?: Exercise[];
+type Props = {
+  onSelectExercise: (exercise: RoutineExercise) => void;
+  availableExercises?: ExerciseFromLibrary[];
+};
+
+const timeBasedNames = ['plank', 'side plank'];
+
+function libToRoutine(lib: ExerciseFromLibrary): RoutineExercise {
+  const name = lib.name ?? '';
+  const isTime = timeBasedNames.some(t => name.toLowerCase().includes(t));
+  const target = Array.isArray(lib.muscleGroups) ? lib.muscleGroups : (lib.muscleGroups ? [String(lib.muscleGroups)] : []);
+
+  return {
+    id: lib.id,
+    exercise: name,
+    target,
+    reps: isTime ? '00:30' : '12',
+    sets: '3',
+    rest: '01:00',
+  };
 }
 
 const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
@@ -43,10 +54,16 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
     const [selectedEquipment, setSelectedEquipment] = useState<string | null>(null);
 
     const filteredExercises = useMemo(() => {
-      return availableExercises.filter((ex) => {
-        const matchesSearch = ex.name.toLowerCase().includes(search.toLowerCase());
-        const matchesMuscle = selectedMuscle ? ex.muscleGroups.includes(selectedMuscle) : true;
-        const matchesEquipment = selectedEquipment ? ex.equipment === selectedEquipment : true;
+      const q = search.toLowerCase();
+      return (availableExercises ?? []).filter((ex) => {
+        const name = (ex.name ?? '').toLowerCase();
+        const groups = Array.isArray(ex.muscleGroups) ? ex.muscleGroups : [];
+        const equipment = ex.equipment ?? 'None';
+
+        const matchesSearch = q === '' || name.includes(q);
+        const matchesMuscle = selectedMuscle ? groups.includes(selectedMuscle) : true;
+        const matchesEquipment = selectedEquipment ? equipment === selectedEquipment : true;
+
         return matchesSearch && matchesMuscle && matchesEquipment;
       });
     }, [search, selectedMuscle, selectedEquipment, availableExercises]);
@@ -56,7 +73,11 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
       dismiss: () => bottomSheetModalRef.current?.dismiss(),
     }));
 
-    const renderFilterChips = (items: string[], selected: string | null, onSelect: (value: string | null) => void) => (
+    const renderFilterChips = (
+      items: string[],
+      selected: string | null,
+      onSelect: (value: string | null) => void
+    ) => (
       <View style={styles.chipContainer}>
         <TouchableOpacity
           style={[styles.chip, selected === null && styles.chipSelected]}
@@ -80,10 +101,13 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
       <BottomSheetModal
         ref={bottomSheetModalRef}
         snapPoints={snapPoints}
-        backdropComponent={(props) => <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} />}
+        backdropComponent={(props) => (
+          <BottomSheetBackdrop {...props} appearsOnIndex={0} disappearsOnIndex={-1} />
+        )}
       >
         <BottomSheetScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
           <Text style={styles.title}>Add Exercise</Text>
+
           <TextInput
             placeholder="Search Exercises"
             placeholderTextColor="#888"
@@ -98,22 +122,24 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
           <Text style={styles.filterTitle}>Equipment</Text>
           {renderFilterChips(equipmentTypes, selectedEquipment, setSelectedEquipment)}
 
-          {filteredExercises.map((item) => (
-            <TouchableOpacity
-              key={item.id}
-              style={styles.exerciseItem}
-              onPress={() => {
-                onSelectExercise(item);
-                bottomSheetModalRef.current?.dismiss();
-              }}
-            >
-              <Text style={styles.exerciseName}>{item.name}</Text>
-              <Text style={styles.exerciseDetails}>
-                {(item.muscleGroups || []).join(", ")} | {item.equipment} | {item.reps} reps · {item.sets} sets · {item.rest} rest
-              </Text>
-            </TouchableOpacity>
-          ))}
-
+          {filteredExercises.map((item) => {
+            const preview = libToRoutine(item); // compute defaults for display
+            return (
+              <TouchableOpacity
+                key={item.id}
+                style={styles.exerciseItem}
+                onPress={() => {
+                  onSelectExercise(preview);      // return routine-ready item
+                  bottomSheetModalRef.current?.dismiss();
+                }}
+              >
+                <Text style={styles.exerciseName}>{item.name}</Text>
+                <Text style={styles.exerciseDetails}>
+                  {(preview.target ?? []).join(', ')} | {preview.equipment ?? 'None'} | {preview.reps} reps · {preview.sets} sets · {preview.rest} rest
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </BottomSheetScrollView>
       </BottomSheetModal>
     );
@@ -121,63 +147,17 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
 );
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    flexGrow: 1,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    color: '#000',
-  },
-  searchInput: {
-    borderRadius: 8,
-    backgroundColor: '#eee',
-    padding: 10,
-    marginBottom: 12,
-    color: '#000',
-  },
-  filterTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginTop: 12,
-    color: '#333',
-  },
-  chipContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginVertical: 8,
-  },
-  chip: {
-    backgroundColor: '#ccc',
-    borderRadius: 20,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  chipSelected: {
-    backgroundColor: '#5FA3D6',
-  },
-  chipText: {
-    color: '#fff',
-    fontWeight: '500',
-  },
-  exerciseItem: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#ddd',
-  },
-  exerciseName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#000',
-  },
-  exerciseDetails: {
-    fontSize: 14,
-    color: '#555',
-  },
+  container: { padding: 16, flexGrow: 1 },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 12, color: '#000' },
+  searchInput: { borderRadius: 8, backgroundColor: '#eee', padding: 10, marginBottom: 12, color: '#000' },
+  filterTitle: { fontSize: 14, fontWeight: '600', marginTop: 12, color: '#333' },
+  chipContainer: { flexDirection: 'row', flexWrap: 'wrap', marginVertical: 8 },
+  chip: { backgroundColor: '#ccc', borderRadius: 20, paddingVertical: 6, paddingHorizontal: 12, marginRight: 8, marginBottom: 8 },
+  chipSelected: { backgroundColor: '#5FA3D6' },
+  chipText: { color: '#fff', fontWeight: '500' },
+  exerciseItem: { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: '#ddd' },
+  exerciseName: { fontSize: 16, fontWeight: '600', color: '#000' },
+  exerciseDetails: { fontSize: 14, color: '#555' },
 });
 
 export default AddExerciseModal;

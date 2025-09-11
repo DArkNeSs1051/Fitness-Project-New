@@ -24,7 +24,7 @@ import {
 export type EditExercise = {
   id: string;
   exercise: string;
-  target: string;
+  target: string; // keep string since you don’t edit it here
   reps: number | string; 
   sets: number;
   rest: string; 
@@ -43,7 +43,6 @@ const ITEM_HEIGHT = 40;
 const VISIBLE_ITEMS = 3;
 const PICKER_HEIGHT = ITEM_HEIGHT * VISIBLE_ITEMS;
 
-// Check if an exercise uses time format
 const isTimeBasedExercise = (exerciseName: string): boolean => {
   const timeBasedExercises = ['plank', 'wall sit', 'hold', 'static'];
   return timeBasedExercises.some(keyword => 
@@ -51,20 +50,16 @@ const isTimeBasedExercise = (exerciseName: string): boolean => {
   );
 };
 
-// Parse time string (MM:SS) to total seconds
 const parseTimeToSeconds = (timeStr: string): { minutes: number; seconds: number } => {
   if (typeof timeStr !== 'string' || !timeStr.includes(':')) {
     return { minutes: 0, seconds: 0 };
   }
-  
   const [minStr, secStr] = timeStr.split(':');
   const minutes = Math.max(0, Math.min(parseInt(minStr) || 0, 10));
   const seconds = Math.max(0, Math.min(parseInt(secStr) || 0, 59));
-  
   return { minutes, seconds };
 };
 
-// Format time from minutes and seconds
 const formatTime = (minutes: number, seconds: number): string => {
   return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
 };
@@ -88,16 +83,14 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
     const minutesArray = useMemo(() => Array.from({ length: 11 }, (_, i) => i), []);
     const secondsArray = useMemo(() => Array.from({ length: 12 }, (_, i) => i * 5), []);
     
-    // Time-based arrays for exercises like plank
-    const timeMinutesArray = useMemo(() => Array.from({ length: 11 }, (_, i) => i), []); // 0-10 minutes
-    const timeSecondsArray = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []); // 0-59 seconds
+    const timeMinutesArray = useMemo(() => Array.from({ length: 11 }, (_, i) => i), []);
+    const timeSecondsArray = useMemo(() => Array.from({ length: 60 }, (_, i) => i), []);
 
     const [selectedReps, setSelectedReps] = useState(1);
     const [selectedSets, setSelectedSets] = useState(1);
     const [selectedMinute, setSelectedMinute] = useState(0);
     const [selectedSecond, setSelectedSecond] = useState(0);
     
-    // Time-based states
     const [selectedTimeMinute, setSelectedTimeMinute] = useState(0);
     const [selectedTimeSecond, setSelectedTimeSecond] = useState(30);
 
@@ -107,18 +100,15 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
       if (isModalVisible && exercise) {
         const timer = setTimeout(() => {
           if (isTimeBased) {
-            // Scroll time pickers
             const timeMinutesOffset = selectedTimeMinute * ITEM_HEIGHT;
             const timeSecondsOffset = selectedTimeSecond * ITEM_HEIGHT;
             timeMinutesListRef.current?.scrollToOffset({ offset: timeMinutesOffset, animated: false });
             timeSecondsListRef.current?.scrollToOffset({ offset: timeSecondsOffset, animated: false });
           } else {
-            // Scroll reps picker
             const repsOffset = (selectedReps - 1) * ITEM_HEIGHT;
             repsListRef.current?.scrollToOffset({ offset: repsOffset, animated: false });
           }
           
-          // Always scroll sets and rest time pickers
           const setsOffset = (selectedSets - 1) * ITEM_HEIGHT;
           const minutesOffset = selectedMinute * ITEM_HEIGHT;
           const secondsIndex = secondsArray.indexOf(selectedSecond);
@@ -166,15 +156,13 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
 
     const handleSave = () => {
       if (exercise) {
-        const formattedRest = `${String(selectedMinute).padStart(2, '0')}:${String(
-          selectedSecond
-        ).padStart(2, '0')}`;
+        const formattedRest = `${String(selectedMinute).padStart(2, '0')}:${String(selectedSecond).padStart(2, '0')}`;
 
         const repsValue = isTimeBased 
           ? formatTime(selectedTimeMinute, selectedTimeSecond)
           : selectedReps;
 
-        const updated = {
+        const updated: EditExercise = {
           ...exercise,
           reps: repsValue,
           sets: selectedSets,
@@ -193,7 +181,6 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
       }
     }, []);
 
-    // Scroll handlers
     const handleRepsScroll = useCallback((event: any) => {
       const y = event.nativeEvent.contentOffset.y;
       const index = Math.round(y / ITEM_HEIGHT);
@@ -225,7 +212,6 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
       setSelectedSecond(secondsArray[clampedIndex]);
     }, [secondsArray]);
 
-    // Time-based scroll handlers
     const handleTimeMinutesScroll = useCallback((event: any) => {
       const y = event.nativeEvent.contentOffset.y;
       const index = Math.round(y / ITEM_HEIGHT);
@@ -324,7 +310,6 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
                   </View>
                 </View>
               ) : (
-                // Regular reps picker
                 <View style={styles.pickerWrapper}>
                   <View style={styles.selectionIndicator} />
                   <FlatList
@@ -351,7 +336,6 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
               )}
             </View>
 
-            {/* Sets Picker */}
             <View style={styles.flexRepSet}>
               <Text style={styles.label}>Sets</Text>
               <View style={styles.pickerWrapper}>
@@ -380,10 +364,8 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
             </View>
           </View>
 
-          {/* Rest Time Picker */}
           <Text style={styles.label}>Rest Time (MM:SS)</Text>
           <View style={styles.pickerContainer}>
-            {/* Minutes */}
             <View style={styles.pickerWrapper}>
               <View style={styles.selectionIndicator} />
               <FlatList
@@ -410,7 +392,6 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
             
             <Text style={styles.colon}>:</Text>
             
-            {/* Seconds */}
             <View style={styles.pickerWrapper}>
               <View style={styles.selectionIndicator} />
               <FlatList
@@ -446,123 +427,24 @@ const EditExerciseModal = forwardRef<EditExerciseModalRef, Props>(
 );
 
 const styles = StyleSheet.create({
-  container: {
-    padding: 16,
-    flex: 1,
-  },
-  containerRepSet: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginHorizontal: 30,
-    marginBottom: 20,
-  },
-  flexRepSet: {
-    flexDirection: 'column',
-    marginTop: 10,
-    padding: 5,
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 16,
-    color: '#000',
-    textAlign: 'center',
-  },
-  label: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginVertical: 8,
-    color: '#000',
-    textAlign: 'center',
-  },
-  pickerWrapper: {
-    height: PICKER_HEIGHT,
-    width: 80,
-    position: 'relative',
-    borderRadius: 8,
-    overflow: 'hidden',
-  },
-  timePickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  timeColon: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    marginHorizontal: 8,
-    color: '#5FA3D6',
-    alignSelf: 'center',
-    marginTop: 20, 
-  },
-  selectionIndicator: {
-    position: 'absolute',
-    top: ITEM_HEIGHT,
-    left: 0,
-    right: 0,
-    height: ITEM_HEIGHT,
-    backgroundColor: 'rgba(95, 163, 214, 0.2)',
-    borderRadius: 8,
-    zIndex: 1,
-    pointerEvents: 'none',
-  },
-  pickerList: {
-    paddingVertical: ITEM_HEIGHT,
-  },
-  pickerItem: {
-    height: ITEM_HEIGHT,
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 2,
-  },
-  selectedPickerItem: {
- 
-  },
-  pickerText: {
-    fontSize: 18,
-    color: '#666',
-    fontWeight: '500',
-  },
-  selectedText: {
-    color: '#5FA3D6',
-    fontWeight: 'bold',
-    fontSize: 20,
-  },
-  pickerContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 24,
-    marginHorizontal: 50,
-  },
-  colon: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginHorizontal: 16,
-    color: '#5FA3D6',
-  },
-  saveButton: {
-    backgroundColor: '#5FA3D6',
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 20,
-    marginHorizontal: 20,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontWeight: 'bold',
-    textAlign: 'center',
-    fontSize: 16,
-  },
+  container: { padding: 16, flex: 1 },
+  containerRepSet: { flexDirection: 'row', justifyContent: 'space-between', marginHorizontal: 30, marginBottom: 20 },
+  flexRepSet: { flexDirection: 'column', marginTop: 10, padding: 5, justifyContent: 'center' },
+  title: { fontSize: 18, fontWeight: 'bold', marginBottom: 16, color: '#000', textAlign: 'center' },
+  label: { fontSize: 16, fontWeight: '600', marginVertical: 8, color: '#000', textAlign: 'center' },
+  pickerWrapper: { height: PICKER_HEIGHT, width: 80, position: 'relative', borderRadius: 8, overflow: 'hidden' },
+  timePickerContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center' },
+  timeColon: { fontSize: 20, fontWeight: 'bold', marginHorizontal: 8, color: '#5FA3D6', alignSelf: 'center', marginTop: 20 },
+  selectionIndicator: { position: 'absolute', top: ITEM_HEIGHT, left: 0, right: 0, height: ITEM_HEIGHT, backgroundColor: 'rgba(95, 163, 214, 0.2)', borderRadius: 8, zIndex: 1, pointerEvents: 'none' },
+  pickerList: { paddingVertical: ITEM_HEIGHT },
+  pickerItem: { height: ITEM_HEIGHT, justifyContent: 'center', alignItems: 'center', zIndex: 2 },
+  selectedPickerItem: {},
+  pickerText: { fontSize: 18, color: '#666', fontWeight: '500' },
+  selectedText: { color: '#5FA3D6', fontWeight: 'bold', fontSize: 20 },
+  pickerContainer: { flexDirection: 'row', justifyContent: 'center', alignItems: 'center', marginBottom: 24, marginHorizontal: 50 },
+  colon: { fontSize: 24, fontWeight: 'bold', marginHorizontal: 16, color: '#5FA3D6' },
+  saveButton: { backgroundColor: '#5FA3D6', paddingVertical: 14, borderRadius: 12, marginTop: 20, marginHorizontal: 20, elevation: 2, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.1, shadowRadius: 4 },
+  saveButtonText: { color: 'white', fontWeight: 'bold', textAlign: 'center', fontSize: 16 },
 });
 
 export default EditExerciseModal;

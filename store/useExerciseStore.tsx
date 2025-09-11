@@ -15,7 +15,7 @@ export const useExerciseStore = create<ExerciseStore>((set) => ({
   const data = snapshot.docs.map((doc) => {
     const docData = doc.data();
     return {
-      id: doc.id,
+      id: docData.id,
       name: docData.name,
       videoUrl: docData.videoUrl,
       image: docData.image,

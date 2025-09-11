@@ -32,6 +32,8 @@ export const ProgressSection = () => {
     count: 1,
   }));
 
+  const handleToolTip: any = {}
+
   return (
     <View style={[styles.container, shadows.large]}>
       <Text style={styles.title}>Your Progress</Text>
@@ -46,6 +48,7 @@ export const ProgressSection = () => {
           height={280}
           squareSize={20}
           gutterSize={5}
+          tooltipDataAttrs={(value) => handleToolTip}
           chartConfig={{
             backgroundColor: '#42779F',
             backgroundGradientFrom: '#42779F',
@@ -111,7 +114,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     padding: 16,
     marginHorizontal: 16,
-    marginBottom: 16,
+    marginBottom: 30,
   },
   title: {
     color: '#e8eef3',

@@ -3,10 +3,9 @@ import { View, Text, ScrollView, TouchableOpacity, Alert, ActivityIndicator } fr
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { VideoView, useVideoPlayer } from 'expo-video';
+import { useEvent } from 'expo';
 import { useExerciseStore } from '../../store/useExerciseStore';
 import { Exercise } from '../../types/Type';
-
-
 
 const ExerciseDetail: React.FC = () => {
   const router = useRouter();
@@ -17,12 +16,16 @@ const ExerciseDetail: React.FC = () => {
   const [videoError, setVideoError] = useState<boolean>(false);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [showControls, setShowControls] = useState<boolean>(false);
-
   const [exercise, setExercise] = useState<Exercise | null>(null);
 
-  // Access exercises and fetch function from store
+  // Access exercises 
   const exercises = useExerciseStore((state) => state.exercises);
   const fetchExercises = useExerciseStore((state) => state.fetchExercises);
+
+  // Validate video URL
+  const isValidVideoUrl = (url: string | undefined): boolean => {
+    return !!(url && (url.startsWith('http://') || url.startsWith('https://')));
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -43,7 +46,7 @@ const ExerciseDetail: React.FC = () => {
         router.back();
       } else {
         setExercise(found);
-        if (!found.videoUrl || !found.videoUrl.startsWith('http')) {
+        if (!isValidVideoUrl(found.videoUrl)) {
           setVideoError(true);
         }
       }
@@ -54,13 +57,35 @@ const ExerciseDetail: React.FC = () => {
     loadData();
   }, [exerciseId, exercises]);
 
-  const player = useVideoPlayer(exercise?.videoUrl || '', (player) => {
-    player.loop = true;
-    player.muted = true;
-    player.play();
-  });
+  const player = useVideoPlayer(
+    exercise?.videoUrl && !videoError && isValidVideoUrl(exercise.videoUrl) ? exercise.videoUrl : '',
+    (player) => {
+      if (exercise?.videoUrl && !videoError && isValidVideoUrl(exercise.videoUrl)) {
+        player.loop = true;
+        player.muted = true;
+        player.play();
+      }
+    }
+  );
+
+  const handleVideoError = (error: any) => {
+    console.error('Video error:', error);
+    setVideoError(true);
+    setIsPlaying(false);
+    Alert.alert('Video Error', 'Unable to load video content');
+  };
+
+  const playerStatus = useEvent(player, 'statusChange');
+
+  useEffect(() => {
+    if (playerStatus?.error) {
+      handleVideoError(playerStatus.error);
+    }
+  }, [playerStatus?.error]);
 
   const togglePlayPause = () => {
+    if (!player || videoError) return;
+
     if (isPlaying) {
       player.pause();
       setIsPlaying(false);
@@ -79,17 +104,35 @@ const ExerciseDetail: React.FC = () => {
     }
   }, [isPlaying, showControls]);
 
-  const handleVideoError = (error: any) => {
-    console.error('Video error:', error);
-    setVideoError(true);
-    Alert.alert('Video Error', 'Unable to load video content');
-  };
+  const hasValidVideo = exercise?.videoUrl && !videoError && isValidVideoUrl(exercise.videoUrl);
 
-  if (loading || !exercise) {
+  if (loading) {
     return (
-      <View className="flex-1 bg-[#84BDEA] justify-center items-center">
-        <ActivityIndicator size="large" color="white" />
-        <Text className="text-white mt-4">Loading exercise...</Text>
+      <View className="flex-1 bg-[#84BDEA]">
+        <View className="px-2 pt-5">
+          <View className="relative rounded-xl overflow-hidden bg-gray-300 h-[250px] justify-center items-center">
+            <ActivityIndicator size="large" color="#84BDEA" />
+          </View>
+        </View>
+        <View className="flex-1 mt-4 px-2 justify-center items-center">
+          <ActivityIndicator size="large" color="white" />
+          <Text className="text-white mt-4">Loading exercise...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  if (!exercise) {
+    return (
+      <View className="flex-1 bg-[#84BDEA] justify-center items-center px-4">
+        <Ionicons name="alert-circle" size={50} color="white" />
+        <Text className="text-white text-lg mt-4 text-center">Exercise not found</Text>
+        <TouchableOpacity
+          onPress={() => router.back()}
+          className="bg-white/20 px-6 py-3 rounded-lg mt-4"
+        >
+          <Text className="text-white font-semibold">Go Back</Text>
+        </TouchableOpacity>
       </View>
     );
   }
@@ -97,7 +140,7 @@ const ExerciseDetail: React.FC = () => {
   return (
     <View className="flex-1 bg-[#84BDEA] px-2 pt-5">
       <View className="relative rounded-xl overflow-hidden bg-black">
-        {!videoError ? (
+        {hasValidVideo ? (
           <>
             <VideoView
               player={player}
@@ -106,7 +149,6 @@ const ExerciseDetail: React.FC = () => {
               allowsPictureInPicture={false}
               contentFit="cover"
               nativeControls={false}
-              onError={handleVideoError}
             />
             <TouchableOpacity
               onPress={togglePlayPause}
@@ -150,41 +192,49 @@ const ExerciseDetail: React.FC = () => {
 
       <ScrollView className="flex-1 mt-4" showsVerticalScrollIndicator={false}>
         <View className="bg-[#1E293B] rounded-xl p-5">
-          <View className="mb-6">
-            <Text className="text-white text-lg font-semibold mb-3">Equipment</Text>
-            <View className="bg-[#2D3B50] p-4 rounded-lg">
-              <Text className="text-white text-base">{exercise.equipment}</Text>
+          {exercise.equipment && (
+            <View className="mb-6">
+              <Text className="text-white text-lg font-semibold mb-3">Equipment</Text>
+              <View className="bg-[#2D3B50] p-4 rounded-lg">
+                <Text className="text-white text-base">{exercise.equipment}</Text>
+              </View>
             </View>
-          </View>
+          )}
 
-          <View className="mb-6">
-            <Text className="text-white text-lg font-semibold mb-3">Muscles</Text>
-            <View className="bg-[#2D3B50] p-4 rounded-lg">
-              <Text className="text-white text-base">{exercise.muscleGroups?.join(', ')}</Text>
+          {exercise.muscleGroups && exercise.muscleGroups.length > 0 && (
+            <View className="mb-6">
+              <Text className="text-white text-lg font-semibold mb-3">Muscles</Text>
+              <View className="bg-[#2D3B50] p-4 rounded-lg">
+                <Text className="text-white text-base">{exercise.muscleGroups.join(', ')}</Text>
+              </View>
             </View>
-          </View>
+          )}
 
-          <View className="mb-6">
-            <Text className="text-white text-lg font-semibold mb-3">Description</Text>
-            <View className="bg-[#2D3B50] p-4 rounded-lg">
-              <Text className="text-white text-base leading-6">{exercise.description}</Text>
+          {exercise.description && (
+            <View className="mb-6">
+              <Text className="text-white text-lg font-semibold mb-3">Description</Text>
+              <View className="bg-[#2D3B50] p-4 rounded-lg">
+                <Text className="text-white text-base leading-6">{exercise.description}</Text>
+              </View>
             </View>
-          </View>
+          )}
 
-          <View className="mb-6">
-            <Text className="text-white text-lg font-semibold mb-3">Instruction</Text>
-            <View className="bg-[#2D3B50] p-4 rounded-lg">
-              {(exercise.instruction || []).map((item, index) => (
-                <Text
-                  key={index}
-                  className="text-white text-base leading-6"
-                  style={{ marginBottom: 12 }}
-                >
-                  {item}
-                </Text>
-              ))}
+          {exercise.instruction && exercise.instruction.length > 0 && (
+            <View className="mb-6">
+              <Text className="text-white text-lg font-semibold mb-3">Instructions</Text>
+              <View className="bg-[#2D3B50] p-4 rounded-lg">
+                {exercise.instruction.map((item, index) => (
+                  <View key={index} className="mb-3">
+                    <View className="flex-row items-start">
+                      <Text className="text-white text-base leading-6 flex-1">
+                        {item}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </ScrollView>
     </View>
