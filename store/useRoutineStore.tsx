@@ -9,15 +9,13 @@ import dayjs from "dayjs";
 type Day = { exercises: RoutineExercise[]; completed: boolean; title?: string };
 
 interface RoutineStore {
-  ownerId: string | null;                                // <-- which user this data belongs to
+  ownerId: string | null;                              
   workouts: Record<string, Day>;
   selectedDate: string;
   loading: boolean;
   error?: string | null;
-
-  // setters/actions
   setSelectedDate: (date: string) => void;
-  reset: () => void;                                     // <-- wipe stale data on user switch/sign-out
+  reset: () => void;                                  
   fetchRoutineFromFirestore: (userId: string) => Promise<void>;
   saveDayRoutine: (userId: string, date: string) => Promise<void>;
   addExercise: (userId: string, exercise: RoutineExercise) => void;
@@ -50,7 +48,7 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     try {
       const { ownerId } = get();
 
-      // 🔒 If the user changed, wipe previous user's data first
+      // If the user changed, wipe previous user's data first
       if (ownerId && ownerId !== userId) {
         set({ workouts: {}, selectedDate: dayjs().format("YYYY-MM-DD") });
       }
@@ -82,7 +80,6 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     const { workouts } = get();
     try {
       const ref = doc(FIRESTORE_DB, "users", userId, "routines", date);
-      // strip undefined
       const cleaned = JSON.parse(JSON.stringify(workouts[date] ?? { exercises: [], completed: false }));
       await setDoc(ref, cleaned, { merge: true });
     } catch (error) {
@@ -104,7 +101,6 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
 
   addExercise: (userId, exercise) => {
     const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
-    // guard against wrong-user calls
     if (ownerId && ownerId !== userId) {
       set({ ownerId: userId, workouts: {}, selectedDate: dayjs().format("YYYY-MM-DD") });
     }
