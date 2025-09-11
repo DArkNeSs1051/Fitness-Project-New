@@ -1,105 +1,139 @@
-import { useUser } from "@clerk/clerk-expo";
 import React, { useEffect, useRef, useState } from "react";
 import { WebView } from "react-native-webview";
-import { FIRESTORE_DB } from "~/firebase";
-import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
+import { useUser } from "@clerk/clerk-expo";
 import { useNavigation } from "expo-router";
+import { doc, getDoc, setDoc } from "firebase/firestore";
+import { FIRESTORE_DB } from "~/firebase";
 import { useFitnessFormStore } from "~/store/useFitnessFormStore";
+import { useUserStore } from "~/store/useUserStore";
 
 export default function MFTTestScreen() {
   const webviewRef = useRef<WebView>(null);
-  const form = useFitnessFormStore((state) => state.form);
-  const setForm = useFitnessFormStore((state) => state.setForm);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const payload = {
-        type: "FROM_TEST",
-        gender: form.gender,
-        // payload: workoutExercise,
-        // video: b,
-      };
-
-      const jsCode = `
-      window.dispatchEvent(
-        new MessageEvent('message', {
-          data: ${JSON.stringify(JSON.stringify(payload))}
-        })
-      );
-      true;
-    `;
-
-      webviewRef.current?.injectJavaScript(jsCode);
-    }, 2000); // ทุก 2 วินาที
-
-    return () => clearInterval(interval);
-  }, []);
+  const formGender = useFitnessFormStore((s) => s.form?.gender);
+  const setForm = useFitnessFormStore((s) => s.setForm);
+  const profileGender = useUserStore((s) => s.user?.gender);
 
   const { user } = useUser();
+  const navigation = useNavigation();
   const [ok, setOk] = useState(false);
 
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+
+    const run = async () => {
+      let effectiveGender: string | undefined =
+        profileGender ?? formGender;
+
+      try {
+        if (user?.id) {
+          const userRef = doc(FIRESTORE_DB, "users", user.id);
+          const snap = await getDoc(userRef);
+          if (!cancelled && snap.exists()) {
+            const dbGender = snap.data()?.gender as string | undefined;
+            if (dbGender) {
+              effectiveGender = dbGender;
+              if (dbGender !== formGender) {
+                setForm(() => ({ gender: dbGender }));
+              }
+            }
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load user gender:", e);
+      }
+
+      const sendToWeb = () => {
+        const payload = {
+          type: "FROM_TEST",
+          gender: effectiveGender ?? formGender ?? "unknown",
+        };
+        const jsCode = `
+          window.dispatchEvent(
+            new MessageEvent('message', {
+              data: ${JSON.stringify(JSON.stringify(payload))}
+            })
+          );
+          true;
+        `;
+        webviewRef.current?.injectJavaScript(jsCode);
+      };
+
+      sendToWeb();
+      intervalId = setInterval(sendToWeb, 2000);
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+      if (intervalId) clearInterval(intervalId);
+    };
+  }, [user?.id, profileGender, formGender, setForm]);
+
   const onMessage = (event: any) => {
-    const text = event.nativeEvent.data;
-    const parsed = JSON.parse(text);
-    if (parsed.level) {
-      setForm((prev: any) => ({
-        ...prev,
-        level: parsed.level,
-        index: 3,
-      }));
-      setOk(true);
+    try {
+      const text = event?.nativeEvent?.data;
+      if (!text) return;
+      const parsed = JSON.parse(text);
+      if (parsed?.level) {
+        setForm((prev: any) => ({
+          ...prev,
+          level: parsed.level,
+          index: 3,
+        }));
+        setOk(true);
+      }
+    } catch (e) {
+      console.warn("Failed to parse message from WebView:", e);
     }
   };
 
   useEffect(() => {
-    const findId = async () => {
+    const saveLevel = async () => {
       if (!user?.id) return;
+      const level = useFitnessFormStore.getState().form?.level;
+      if (!level || !ok) return;
 
-      const docRef = doc(FIRESTORE_DB, "users", user.id);
-
-      if (form.level && ok) {
-        const updatedData = {
-          level: form.level,
-          updatedAt: new Date().toISOString(),
-        };
-        await setDoc(docRef, updatedData, { merge: true });
+      try {
+        const docRef = doc(FIRESTORE_DB, "users", user.id);
+        await setDoc(
+          docRef,
+          {
+            level,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
+      } catch (e) {
+        console.error("Failed to save level:", e);
       }
     };
 
-    findId();
-  }, [user, form, ok]);
-
-  const navigation = useNavigation();
+    saveLevel();
+  }, [user?.id, ok]);
 
   useEffect(() => {
-    if (ok) {
-      const timer = setTimeout(() => {
-        navigation.goBack(); // ✅ กลับหน้าก่อนหน้า
-      }, 10000); // 10 วินาที = 10000 มิลลิวินาที
-
-      return () => clearTimeout(timer); // cleanup ถ้า component unmount ก่อนครบเวลา
-    }
-  }, [ok]);
+    if (!ok) return;
+    const timer = setTimeout(() => {
+      navigation.goBack();
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [ok, navigation]);
 
   return (
     <WebView
       ref={webviewRef}
       style={{ flex: 1 }}
       source={{ uri: "https://newcamera-pi.vercel.app/" }}
-      // source={{ uri: "http://192.168.1.117:3000" }}
       mediaPlaybackRequiresUserAction={false}
-      allowsInlineMediaPlayback={true}
-      javaScriptEnabled={true}
+      allowsInlineMediaPlayback
+      javaScriptEnabled
       allowsFullscreenVideo
-      domStorageEnabled={true}
+      domStorageEnabled
       originWhitelist={["*"]}
-      allowFileAccess={true}
-      allowUniversalAccessFromFileURLs={true}
-      // injectedJavaScript={`
-      //   window.localStorage.setItem('token', '${token}');
-      //   window.dispatchEvent(new Event('storage'));
-      //   true;
-      // `}
+      allowFileAccess
+      allowUniversalAccessFromFileURLs
       onMessage={onMessage}
     />
   );
