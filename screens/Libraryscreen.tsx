@@ -22,8 +22,8 @@ const categories = [
   { id: 'cardio', name: 'Cardio' }
 ];
 
-const muscles = ['Chest', 'Back', 'Arms', 'Legs', 'Core'];
-const equipmentList = ['None', 'Barbell', 'Dumbbell', 'Machine'];
+const muscles = ['Chest', 'Back', 'Arms', 'Legs', 'Core', 'Full Body'];
+const equipmentList = ['None', 'Dumbbell'];
 const level = ['Beginner', 'Intermediate', 'Advanced'];
 
 

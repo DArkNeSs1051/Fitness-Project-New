@@ -4,25 +4,32 @@ import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { shadows } from "~/utils/shadow";
 
-const HorizontalCalendar = ({ selectedDate, onSelectDate, workoutDays }) => {
+type WorkoutDayMark = {
+  marked: boolean;
+  dotColor: string;
+};
+type WorkoutDaysMap = Record<string, WorkoutDayMark>;
+
+interface Props {
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  workoutDays: WorkoutDaysMap;
+}
+
+const HorizontalCalendar: React.FC<Props> = ({ selectedDate, onSelectDate, workoutDays }) => {
   const [currentDate, setCurrentDate] = useState(dayjs(selectedDate));
 
   useEffect(() => {
-    // Update currentDate to match the selectedDate's week
     setCurrentDate(dayjs(selectedDate).startOf("week"));
   }, [selectedDate]);
 
-  // Get the start of the week
   const startOfWeek = currentDate.startOf("week");
   const weekDays = Array.from({ length: 7 }, (_, i) =>
     startOfWeek.add(i, "day").format("YYYY-MM-DD")
   );
 
-  // Move to the previous week
-  const prevWeek = () => setCurrentDate(currentDate.subtract(7, "day"));
-
-  // Move to the next week
-  const nextWeek = () => setCurrentDate(currentDate.add(7, "day"));
+  const prevWeek = () => setCurrentDate((d) => d.subtract(7, "day"));
+  const nextWeek = () => setCurrentDate((d) => d.add(7, "day"));
 
   return (
     <View className="p-4 bg-[#42779F] rounded-lg" style={shadows.large}>
@@ -44,21 +51,19 @@ const HorizontalCalendar = ({ selectedDate, onSelectDate, workoutDays }) => {
         data={weekDays}
         horizontal
         keyExtractor={(item) => item}
+        showsHorizontalScrollIndicator={false}
         renderItem={({ item }) => {
           const isSelected = item === selectedDate;
-          const isWorkoutDay = workoutDays[item];
+          const mark = workoutDays[item]; 
+          const hasWorkout = !!mark?.marked;
 
           return (
-            <TouchableOpacity
-              onPress={() => onSelectDate(item)}
-              className="mx-2"
-            >
-              {/* Fixed width container with consistent styling */}
+            <TouchableOpacity onPress={() => onSelectDate(item)} className="mx-2">
               <View
                 className={`w-12 h-16 p-2 rounded-lg justify-center items-center ${
                   isSelected ? "bg-[#5FA3D6]" : "bg-[#42779F]"
                 }`}
-                style={isSelected ? { borderWidth: 2, borderColor: '#5FA3D6' } : {}}
+                
               >
                 <Text className="text-center text-white font-bold text-xs">
                   {dayjs(item).format("dd").toUpperCase()}
@@ -66,14 +71,16 @@ const HorizontalCalendar = ({ selectedDate, onSelectDate, workoutDays }) => {
                 <Text className="text-center text-white text-lg">
                   {dayjs(item).date()}
                 </Text>
-                {isWorkoutDay && (
-                  <View className="w-2 h-2 bg-white rounded-full mt-1" />
+                {hasWorkout && (
+                  <View
+                    className="w-2 h-2 rounded-full mt-1"
+                    style={{ backgroundColor: "#FFFFFF" }}
+                  />
                 )}
               </View>
             </TouchableOpacity>
           );
         }}
-        showsHorizontalScrollIndicator={false}
       />
     </View>
   );

@@ -17,7 +17,7 @@ import EditNutritionPlanBottomSheet, { EditNutritionPlanBottomSheetRef } from '~
 import TodayIntakeBottomSheet, {TodayIntakeBottomSheetRef} from '~/components/Modal/TodayIntakeBottomSheet';
 import { FIRESTORE_DB } from '~/firebase';
 import { FIREBASE_AUTH } from '~/firebase';
-import { doc, getDoc, setDoc, arrayUnion, updateDoc  } from 'firebase/firestore';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { useUser } from '@clerk/clerk-expo';
 
 type Food = {
@@ -78,7 +78,7 @@ const NutritionPlanScreen = () => {
     setLoading(true);
 
   try {
-    const today = getLocalDateString(); // YYYY-MM-DD
+    const today = getLocalDateString(); 
 
     const dietlogRef = doc(FIRESTORE_DB, 'users', userId, 'dietlog', today);
     const dietlogSnap = await getDoc(dietlogRef);
@@ -171,7 +171,7 @@ const NutritionPlanScreen = () => {
         fat,
       }));
 
-      await loadData(); // Reload data after update
+      await loadData();
       Alert.alert('Saved', 'Nutrition plan has been generated!');
     } catch (error) {
       console.error('Error updating nutrition plan:', error);
@@ -192,12 +192,11 @@ const handleSaveIntake = async (
   }
 
   const finalCalories = calories ?? (protein * 4 + carbs * 4 + fat * 9);
-  const today = getLocalDateString(); // Your YYYY-MM-DD date function
+  const today = getLocalDateString();
 
   const intakeDocRef = doc(FIRESTORE_DB, 'users', userId, 'dietlog', today);
 
   try {
-    // Get current dietlog document
     const docSnap = await getDoc(intakeDocRef);
     let newProtein = protein;
     let newCarbs = carbs;
@@ -205,7 +204,7 @@ const handleSaveIntake = async (
     let newCalories = finalCalories;
     let newEntries = [
       {
-        id: `manual-${Date.now()}`, // Unique ID for manual entry
+        id: `manual-${Date.now()}`,
         name,
         protein,
         carbs,
@@ -235,7 +234,7 @@ const handleSaveIntake = async (
         entries: newEntries,
       });
     } else {
-      // Create new document if doesn't exist
+      // Create new document
       await setDoc(intakeDocRef, {
         protein: newProtein,
         carbs: newCarbs,
@@ -245,7 +244,6 @@ const handleSaveIntake = async (
       });
     }
 
-    // Update local state
     setDailyProtein(newProtein);
     setDailyCarbs(newCarbs);
     setDailyFat(newFat);
@@ -325,7 +323,6 @@ const handleSaveIntake = async (
       entries: [...entries, ...newEntries],
     });
 
-    // Update local state
     setDailyProtein(currentProtein + totals.protein);
     setDailyCarbs(currentCarbs + totals.carbs);
     setDailyFat(currentFat + totals.fat);

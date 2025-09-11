@@ -45,7 +45,7 @@ function toAllowedLite(exercises, cap = MAX_EX_LIBRARY) {
 
 function buildPrompt({ userData, startDate, endDate, allowedLite }) {
   return `
-Create a detailed 30-day workout plan.
+Create a detailed 15-day workout plan.
 
 User:
 - gender: ${userData.gender}

@@ -4,8 +4,8 @@ export interface User {
     name: string;
     email: string;
     profileImage?: string;
-    height?: number; // in cm
-    weight?: number; // in kg
+    height?: number; 
+    weight?: number; 
     age?: number;
     gender?: 'male' | 'female' | 'other';
     goalType?: 'lose_weight' | 'gain_muscle' | 'maintain' | 'improve_fitness';
@@ -28,7 +28,7 @@ export interface User {
     instruction?: string[];
   }
 
-  export interface RoutineEexercise{
+  export interface RoutineExercise{
     exercise: string;
     id: string;
     reps: string;
@@ -66,6 +66,6 @@ export interface User {
     id: string;
     name: string;
     calories: number;
-    protein: number; // in grams
-    carbs: number; // in grams
+    protein: number; 
+    carbs: number; 
   }
