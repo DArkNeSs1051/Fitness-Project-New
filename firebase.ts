@@ -10,7 +10,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyCPulh5k-rtB6yUYRsh9hVmLOAJam6H_Nk",
   authDomain: "fithealthproject-ba957.firebaseapp.com",
   projectId: "fithealthproject-ba957",
-  storageBucket: "fithealthproject-ba957.appspot.com",
+  storageBucket: "fithealthproject-ba957.firebasestorage.app",
   messagingSenderId: "763892779791",
   appId: "1:763892779791:web:92b4e9b1e51a3c6e0d8c7a",
   measurementId: "G-1L2B4250V2",

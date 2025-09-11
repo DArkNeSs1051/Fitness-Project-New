@@ -23,149 +23,159 @@ type UserProfile = {
 };
 
 type UserStore = {
+  ownerId: string | null;
   user: UserProfile | null;
   isProfileComplete: boolean;
   isLoading: boolean;
   error: string | null;
-  
-  // Core actions
   setUserData: (data: Partial<UserProfile>) => void;
   clearUserData: () => void;
-  
-  // Firestore operations - both now take userId parameter for consistency
+  reset: () => void;
   loadUserDataFromFirestore: (userId: string) => Promise<void>;
   saveUserDataToFirestore: (userId: string) => Promise<void>;
-  
-  // Utility methods
   checkProfileCompletion: () => void;
   setError: (error: string | null) => void;
   setLoading: (loading: boolean) => void;
 };
 
+const toMaybeDate = (v: any): Date | undefined => {
+  if (!v) return undefined;
+  if (v instanceof Date) return v;
+  if (typeof v?.toDate === 'function') return v.toDate();
+  return undefined;
+};
+
 export const useUserStore = create<UserStore>((set, get) => ({
+  ownerId: null,
+
   user: null,
   isProfileComplete: false,
   isLoading: false,
   error: null,
 
   setUserData: (data) => {
-    const currentUser = get().user;
-    const updatedUser = { 
-      ...currentUser, 
+    const current = get().user ?? ({ id: '' } as UserProfile);
+    const updated: UserProfile = {
+      ...current,
       ...data,
-      updatedAt: new Date()
-    } as UserProfile;
-    
-    set({ user: updatedUser });
+      id: (data.id ?? current.id) as string,
+      updatedAt: new Date(),
+    };
+    set({ user: updated });
     get().checkProfileCompletion();
   },
 
   clearUserData: () => {
-    set({ 
-      user: null, 
+    set({
+      user: null,
       isProfileComplete: false,
-      error: null 
+      error: null,
+    });
+  },
+
+  reset: () => {
+    set({
+      ownerId: null,
+      user: null,
+      isProfileComplete: false,
+      isLoading: false,
+      error: null,
     });
   },
 
   checkProfileCompletion: () => {
-    const user = get().user;
-    if (!user) {
+    const u = get().user;
+    if (!u) {
       set({ isProfileComplete: false });
       return;
     }
-
     const isComplete =
-      !!user.firstName &&
-      !!user.lastName &&
-      !!user.email &&
-      !!user.age &&
-      !!user.birthday &&
-      !!user.gender &&
-      !!user.height &&
-      !!user.weight &&
-      !!user.level &&
-      !!user.goal &&
-      !!user.workoutDay;
-
+      !!u.firstName &&
+      !!u.lastName &&
+      !!u.email &&
+      !!u.age &&
+      !!u.birthday &&
+      !!u.gender &&
+      !!u.height &&
+      !!u.weight &&
+      !!u.level &&
+      !!u.goal &&
+      !!u.workoutDay;
     set({ isProfileComplete: isComplete });
   },
 
-  setError: (error) => {
-    set({ error });
-  },
-
-  setLoading: (loading) => {
-    set({ isLoading: loading });
-  },
+  setError: (error) => set({ error }),
+  setLoading: (isLoading) => set({ isLoading }),
 
   loadUserDataFromFirestore: async (userId) => {
     try {
+      // switching users, clear data and set new ownerId
+      if (get().ownerId !== userId) {
+        set({ ownerId: userId, user: null });
+      }
+
       set({ isLoading: true, error: null });
-      
+
       const docRef = doc(FIRESTORE_DB, 'users', userId);
-      const snapshot = await getDoc(docRef);
-      
-      if (snapshot.exists()) {
-        const userData = { 
-          id: userId, 
-          ...snapshot.data(),
-          // Convert Firestore timestamps back to Date objects if needed
-          createdAt: snapshot.data().createdAt?.toDate?.() || snapshot.data().createdAt,
-          updatedAt: snapshot.data().updatedAt?.toDate?.() || snapshot.data().updatedAt,
-        } as UserProfile;
-        
-        get().setUserData(userData);
+      const snap = await getDoc(docRef);
+
+      if (snap.exists()) {
+        const raw = snap.data() as any;
+        const userData: UserProfile = {
+          id: userId,
+          ...raw,
+          createdAt: toMaybeDate(raw.createdAt) ?? raw.createdAt,
+          updatedAt: toMaybeDate(raw.updatedAt) ?? raw.updatedAt,
+          birthday: toMaybeDate(raw.birthday) ?? raw.birthday,
+        };
+        set({ user: userData });
       } else {
-        // User document doesn't exist, create a basic profile
         const newUser: UserProfile = {
           id: userId,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
         };
         set({ user: newUser });
       }
-    } catch (error) {
-      console.error('Error loading user data:', error);
+
+      get().checkProfileCompletion();
+    } catch (err) {
+      console.error('Error loading user data:', err);
       set({ error: 'Failed to load user data' });
     } finally {
       set({ isLoading: false });
     }
   },
 
-  //Explicit userId parameter 
   saveUserDataToFirestore: async (userId) => {
     const { user } = get();
     if (!user) {
       set({ error: 'No user data to save' });
       return;
     }
-
     try {
       set({ isLoading: true, error: null });
-      
+
       const docRef = doc(FIRESTORE_DB, 'users', userId);
-      const { id, ...dataToSave } = user;
-      
-      // Ensure updatedAt is set
+
+      const { id: _omit, ...rest } = user;
       const finalData = {
-        ...dataToSave,
+        ...rest,
         updatedAt: new Date(),
-        // Set createdAt if it doesn't exist
-        createdAt: dataToSave.createdAt || new Date()
+        createdAt: rest.createdAt ?? new Date(),
       };
-      
+
       await setDoc(docRef, finalData, { merge: true });
-      
-      // Update local state with the saved timestamp and correct ID
-      set({ 
-        user: { ...user, id: userId, updatedAt: finalData.updatedAt }
+      set({
+        ownerId: userId,
+        user: { ...user, id: userId, updatedAt: finalData.updatedAt },
       });
-      
-    } catch (error) {
-      console.error('Error saving user data:', error);
+
+      get().checkProfileCompletion();
+    } catch (err) {
+      console.error('Error saving user data:', err);
       set({ error: 'Failed to save user data' });
-      throw error;
+      throw err;
     } finally {
       set({ isLoading: false });
     }

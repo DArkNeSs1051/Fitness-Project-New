@@ -9,23 +9,25 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter, usePathname } from "expo-router";
 
+type IoniconName = React.ComponentProps<typeof Ionicons>["name"];
+
 const BottomNavigator: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
 
-  const handleTabPress = (tabName: string) => {
-    const targetPath = `/${tabName.toLowerCase()}`;
+  const handleTabPress = (tabRoute: string) => {
+    const targetPath = `/${tabRoute.toLowerCase()}`;
     if (pathname !== targetPath) {
       router.push(targetPath);
     }
   };
 
-  const tabs = [
-    { name: "Routines", icon: "calendar" },
-    { name: "Library", icon: "body" },
-    { name: "Workout", icon: "barbell" },
-    { name: "Nutrition", icon: "nutrition" },
-    { name: "Account", icon: "person" },
+  const tabs: { name: string; route: string; icon: IoniconName }[] = [
+    { name: "Routines",  route: "routines",  icon: "calendar" },
+    { name: "Library",   route: "library",   icon: "body" },
+    { name: "Workout",   route: "workout",   icon: "barbell" },
+    { name: "Nutrition", route: "nutrition", icon: "nutrition" },
+    { name: "Account",   route: "account",   icon: "person" },
   ];
 
   return (
@@ -33,19 +35,18 @@ const BottomNavigator: React.FC = () => {
       <View style={styles.shadowWrapper}>
         <View style={styles.tabContainer}>
           {tabs.map((tab, index) => {
-            const isActive = pathname === `/${tab.name.toLowerCase()}`;
+            const targetPath = `/${tab.route}`;
+            const isActive = pathname === targetPath;
             const isFirst = index === 0;
             const isLast = index === tabs.length - 1;
 
             return (
               <TouchableOpacity
-                key={tab.name}
-                className={`flex-1 items-center py-3 ${
-                  isActive ? "bg-[#5FA3D6]" : ""
-                } ${isFirst ? "rounded-l-[12px]" : ""} ${
-                  isLast ? "rounded-r-[12px]" : ""
-                }`}
-                onPress={() => handleTabPress(tab.name)}
+                key={tab.route}
+                className={`flex-1 items-center py-3 ${isActive ? "bg-[#5FA3D6]" : ""} ${
+                  isFirst ? "rounded-l-[12px]" : ""
+                } ${isLast ? "rounded-r-[12px]" : ""}`}
+                onPress={() => handleTabPress(tab.route)}
                 disabled={isActive}
                 style={{ opacity: isActive ? 0.8 : 1 }}
               >
@@ -54,11 +55,7 @@ const BottomNavigator: React.FC = () => {
                   size={24}
                   color={isActive ? "#42779F" : "white"}
                 />
-                <Text
-                  className={`text-xs mt-1 ${
-                    isActive ? "text-[#42779F]" : "text-white"
-                  }`}
-                >
+                <Text className={`text-xs mt-1 ${isActive ? "text-[#42779F]" : "text-white"}`}>
                   {tab.name}
                 </Text>
               </TouchableOpacity>

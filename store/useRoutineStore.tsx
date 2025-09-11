@@ -1,188 +1,154 @@
+// store/useRoutineStore.ts
 import { create } from "zustand";
-import {
-  collection,
-  doc,
-  getDocs,
-  setDoc,
-} from "firebase/firestore";
+import { collection, doc, getDocs, setDoc } from "firebase/firestore";
 import { FIRESTORE_DB } from "../firebase";
-import { RoutineEexercise } from "../types/Type";
+import type { RoutineExercise } from "../types/Type";
 import Toast from "react-native-toast-message";
 import dayjs from "dayjs";
 
+type Day = { exercises: RoutineExercise[]; completed: boolean; title?: string };
+
 interface RoutineStore {
-  workouts: { [date: string]: { exercises: RoutineEexercise[]; completed: boolean; title?: string  } };
+  ownerId: string | null;                                // <-- which user this data belongs to
+  workouts: Record<string, Day>;
   selectedDate: string;
+  loading: boolean;
+  error?: string | null;
+
+  // setters/actions
   setSelectedDate: (date: string) => void;
+  reset: () => void;                                     // <-- wipe stale data on user switch/sign-out
   fetchRoutineFromFirestore: (userId: string) => Promise<void>;
   saveDayRoutine: (userId: string, date: string) => Promise<void>;
-  addExercise: (userId: string, exercise: RoutineEexercise) => void;
-  editExercise: (userId: string, exerciseId: string, updates: Partial<RoutineEexercise>) => void;
+  addExercise: (userId: string, exercise: RoutineExercise) => void;
+  editExercise: (userId: string, exerciseId: string, updates: Partial<RoutineExercise>) => void;
   deleteExercise: (userId: string, exerciseId: string) => void;
-  reorderExercises: (userId: string, newExercises: RoutineEexercise[]) => void;
+  reorderExercises: (userId: string, newExercises: RoutineExercise[]) => void;
   setCompleted: (userId: string, completed: boolean) => void;
   getCompletedDates: () => string[];
 }
 
 export const useRoutineStore = create<RoutineStore>((set, get) => ({
+  ownerId: null,
   workouts: {},
-  selectedDate: "",
+  selectedDate: dayjs().format("YYYY-MM-DD"),
+  loading: false,
+  error: null,
+
   setSelectedDate: (date) => set({ selectedDate: date }),
+
+  reset: () =>
+    set({
+      ownerId: null,
+      workouts: {},
+      selectedDate: dayjs().format("YYYY-MM-DD"),
+      loading: false,
+      error: null,
+    }),
 
   fetchRoutineFromFirestore: async (userId: string) => {
     try {
+      const { ownerId } = get();
+
+      // 🔒 If the user changed, wipe previous user's data first
+      if (ownerId && ownerId !== userId) {
+        set({ workouts: {}, selectedDate: dayjs().format("YYYY-MM-DD") });
+      }
+
+      set({ ownerId: userId, loading: true, error: null });
+
       const routinesRef = collection(FIRESTORE_DB, "users", userId, "routines");
       const querySnapshot = await getDocs(routinesRef);
 
-      const fetchedRoutine: { [key: string]: { exercises: RoutineEexercise[], completed: boolean; title?: string  } } = {};
-
-      querySnapshot.forEach(docSnap => {
-        const data = docSnap.data();
-        fetchedRoutine[docSnap.id] = {
-          exercises: data.exercises || [],
-          completed: data.completed || false,
-          title: data.title || ''
+      const fetched: Record<string, Day> = {};
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Partial<Day>;
+        fetched[docSnap.id] = {
+          exercises: Array.isArray(data.exercises) ? (data.exercises as RoutineExercise[]) : [],
+          completed: !!data.completed,
+          title: data.title || "",
         };
       });
 
-      set({ workouts: fetchedRoutine });
-    } catch (error) {
+      set({ workouts: fetched, loading: false });
+    } catch (error: any) {
       console.error("Error fetching routine:", error);
+      set({ loading: false, error: error?.message ?? "Failed to load routine" });
       Toast.show({ type: "error", text1: "Failed to load routine" });
     }
   },
 
   saveDayRoutine: async (userId, date) => {
-  const { workouts } = get();
-  try {
-    const ref = doc(FIRESTORE_DB, "users", userId, "routines", date);
+    const { workouts } = get();
+    try {
+      const ref = doc(FIRESTORE_DB, "users", userId, "routines", date);
+      // strip undefined
+      const cleaned = JSON.parse(JSON.stringify(workouts[date] ?? { exercises: [], completed: false }));
+      await setDoc(ref, cleaned, { merge: true });
+    } catch (error) {
+      console.error("Error saving routine:", error);
+      Toast.show({ type: "error", text1: "Failed to save routine" });
+    }
+  },
 
-    // Remove undefined values 
-    const cleanedData = JSON.parse(JSON.stringify(workouts[date]));
-
-    await setDoc(ref, cleanedData, { merge: true });
-  } catch (error) {
-    console.error("Error saving routine:", error);
-    Toast.show({ type: "error", text1: "Failed to save routine" });
-  }
-},
-
-getCompletedDates: () => {
-  const { workouts } = get();
-  return Object.entries(workouts)
-    .filter(([_, day]) => day.completed)
-    .map(([date]) => {
-      const d = dayjs(date, ['YYYY-MM-DD', 'DD/MMM/YYYY']);
-      return d.isValid() ? d.format('YYYY-MM-DD') : null;
-    })
-    .filter((date): date is string => date !== null);
-},
-
-
+  getCompletedDates: () => {
+    const { workouts } = get();
+    return Object.entries(workouts)
+      .filter(([, day]) => day?.completed)
+      .map(([date]) => {
+        const d = dayjs(date, ["YYYY-MM-DD", "DD/MMM/YYYY"]);
+        return d.isValid() ? d.format("YYYY-MM-DD") : null;
+      })
+      .filter((d): d is string => !!d);
+  },
 
   addExercise: (userId, exercise) => {
-    const { workouts, selectedDate, saveDayRoutine } = get();
-    const currentWorkout = workouts[selectedDate] || { exercises: [], completed: false };
-    
-    const updated = {
-      ...workouts,
-      [selectedDate]: {
-        exercises: [...currentWorkout.exercises, exercise],
-        completed: currentWorkout.completed,
-      },
-    };
-    set({ workouts: updated });
+    const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
+    // guard against wrong-user calls
+    if (ownerId && ownerId !== userId) {
+      set({ ownerId: userId, workouts: {}, selectedDate: dayjs().format("YYYY-MM-DD") });
+    }
+    const day = workouts[selectedDate] ?? { exercises: [], completed: false };
+    const next = { ...workouts, [selectedDate]: { ...day, exercises: [...day.exercises, exercise] } };
+    set({ workouts: next });
     saveDayRoutine(userId, selectedDate);
   },
 
   editExercise: (userId, exerciseId, updates) => {
-    const { workouts, selectedDate, saveDayRoutine } = get();
-    const currentWorkout = workouts[selectedDate];
-    
-    if (!currentWorkout) return;
-    
-    const updatedExercises = currentWorkout.exercises.map((ex) =>
-      ex.id === exerciseId ? { ...ex, ...updates } : ex
-    );
-    
-    set({
-      workouts: {
-        ...workouts,
-        [selectedDate]: {
-          exercises: updatedExercises,
-          completed: currentWorkout.completed,
-        },
-      },
-    });
+    const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
+    if (ownerId && ownerId !== userId) return;
+    const day = workouts[selectedDate];
+    if (!day) return;
+    const updated = day.exercises.map((ex) => (ex.id === exerciseId ? { ...ex, ...updates } : ex));
+    set({ workouts: { ...workouts, [selectedDate]: { ...day, exercises: updated } } });
     saveDayRoutine(userId, selectedDate);
   },
 
   deleteExercise: (userId, exerciseId) => {
-    const { workouts, selectedDate, saveDayRoutine } = get();
-    const currentWorkout = workouts[selectedDate];
-    
-    if (!currentWorkout) return;
-    
-    const filteredExercises = currentWorkout.exercises.filter(
-      (ex) => ex.id !== exerciseId
-    );
-    
-    set({
-      workouts: {
-        ...workouts,
-        [selectedDate]: {
-          exercises: filteredExercises,
-          completed: currentWorkout.completed,
-        },
-      },
-    });
+    const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
+    if (ownerId && ownerId !== userId) return;
+    const day = workouts[selectedDate];
+    if (!day) return;
+    const filtered = day.exercises.filter((ex) => ex.id !== exerciseId);
+    set({ workouts: { ...workouts, [selectedDate]: { ...day, exercises: filtered } } });
     saveDayRoutine(userId, selectedDate);
   },
 
   reorderExercises: (userId, newExercises) => {
-    const { workouts, selectedDate, saveDayRoutine } = get();
-    const currentWorkout = workouts[selectedDate];
-    
-    if (!currentWorkout) return;
-    
-    set({
-      workouts: {
-        ...workouts,
-        [selectedDate]: {
-          exercises: newExercises,
-          completed: currentWorkout.completed,
-        },
-      },
-    });
+    const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
+    if (ownerId && ownerId !== userId) return;
+    const day = workouts[selectedDate];
+    if (!day) return;
+    set({ workouts: { ...workouts, [selectedDate]: { ...day, exercises: newExercises } } });
     saveDayRoutine(userId, selectedDate);
   },
 
   setCompleted: (userId, completed) => {
-    const { workouts, selectedDate, saveDayRoutine } = get();
-    const currentWorkout = workouts[selectedDate];
-    
-    if (!currentWorkout) {
-      set({
-        workouts: {
-          ...workouts,
-          [selectedDate]: {
-            exercises: [],
-            completed,
-          },
-        },
-      });
-    } else {
-      set({
-        workouts: {
-          ...workouts,
-          [selectedDate]: {
-            ...currentWorkout,
-            completed,
-          },
-        },
-      });
-    }
-    
+    const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
+    if (ownerId && ownerId !== userId) return;
+    const day = workouts[selectedDate] ?? { exercises: [], completed: false };
+    const next = { ...workouts, [selectedDate]: { ...day, completed } };
+    set({ workouts: next });
     saveDayRoutine(userId, selectedDate);
   },
 }));
