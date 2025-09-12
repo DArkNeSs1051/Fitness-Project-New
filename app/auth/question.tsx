@@ -67,9 +67,7 @@ export interface formInterface {
   age: string;
   birthday: Date | null;
   weight: string;
-  weightUnit: string;
   height: string;
-  heightUnit: string;
   level: string;
   goal: string;
   equipment: string;
@@ -256,9 +254,7 @@ const Question = () => {
           age: form.age,
           birthday: form.birthday,
           weight: form.weight,
-          weightUnit: form.weightUnit,
           height: form.height,
-          heightUnit: form.heightUnit,
           level: form.level.toLocaleLowerCase(),
           goal: form.goal.toLocaleLowerCase(),
           equipment: form.equipment,
@@ -272,7 +268,7 @@ const Question = () => {
         await setDoc(userRef, updatedData, { merge: true });
         console.log("✅ User data updated successfully");
 
-        // ✅ Wait a moment for Firestore to sync, then generate workout plan
+        //Wait for Firestore to sync
         await new Promise((resolve) => setTimeout(resolve, 1000));
         await fetchWorkoutPlan();
       } else {
@@ -524,120 +520,36 @@ const Question = () => {
                 </>
               )}
 
-              {/* Weight */}
+              {/* Weight (kg) */}
               <View className="flex flex-col h-[100px]">
                 <View className="flex flex-row items-center">
                   <TextInput
-                    placeholder="Weight"
+                    placeholder="Weight (kg)"
                     placeholderTextColor="#42779F"
-                    className={twMerge(
-                      classes.commonInputStyle,
-                      errors.weight && "border-red-500"
-                    )}
+                    className={twMerge(classes.commonInputStyle, errors.weight && "border-red-500")}
                     keyboardType="numeric"
                     value={form.weight}
                     onChangeText={(text) => onChangeForm("weight", text)}
                   />
-                  <View className="flex-row items-center ml-2 gap-1">
-                    <TouchableOpacity
-                      onPress={() => onChangeForm("weightUnit", "kg")}
-                      activeOpacity={1}
-                      className={unitButtonStyle(form.weightUnit === "kg")}
-                    >
-                      <Text
-                        className={twMerge(
-                          "text-[10px] text-center",
-                          form.weightUnit === "kg"
-                            ? "text-[#FDFDFF]"
-                            : "text-[#142939]"
-                        )}
-                      >
-                        KG
-                      </Text>
-                    </TouchableOpacity>
-                    <Text className="text-[#142939] text-[30px]">/</Text>
-                    <TouchableOpacity
-                      onPress={() => onChangeForm("weightUnit", "lbs")}
-                      activeOpacity={1}
-                      className={unitButtonStyle(form.weightUnit === "lbs")}
-                    >
-                      <Text
-                        className={twMerge(
-                          "text-[10px] text-center",
-                          form.weightUnit === "lbs"
-                            ? "text-[#FDFDFF]"
-                            : "text-[#142939]"
-                        )}
-                      >
-                        Lbs
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
-                {errors.weight ? (
-                  <Text className="text-red-500 text-sm ml-2">
-                    {errors.weight}
-                  </Text>
-                ) : null}
+                {errors.weight ? <Text className="text-red-500 text-sm ml-2">{errors.weight}</Text> : null}
               </View>
 
-              {/* Height */}
+              {/* Height (cm) */}
               <View className="flex flex-col h-[100px]">
                 <View className="flex flex-row items-center">
                   <TextInput
-                    placeholder="Height"
+                    placeholder="Height (cm)"
                     placeholderTextColor="#42779F"
-                    className={twMerge(
-                      classes.commonInputStyle,
-                      errors.height && "border-red-500"
-                    )}
+                    className={twMerge(classes.commonInputStyle, errors.height && "border-red-500")}
                     keyboardType="numeric"
                     value={form.height}
                     onChangeText={(text) => onChangeForm("height", text)}
                   />
-                  <View className="flex-row items-center ml-2 gap-1">
-                    <TouchableOpacity
-                      onPress={() => onChangeForm("heightUnit", "cm")}
-                      activeOpacity={1}
-                      className={unitButtonStyle(form.heightUnit === "cm")}
-                    >
-                      <Text
-                        className={twMerge(
-                          "text-[10px] text-center",
-                          form.heightUnit === "cm"
-                            ? "text-[#FDFDFF]"
-                            : "text-[#142939]"
-                        )}
-                      >
-                        CM
-                      </Text>
-                    </TouchableOpacity>
-                    <Text className="text-[#142939] text-[30px]">/</Text>
-                    <TouchableOpacity
-                      onPress={() => onChangeForm("heightUnit", "ft")}
-                      activeOpacity={1}
-                      className={unitButtonStyle(form.heightUnit === "ft")}
-                    >
-                      <Text
-                        className={twMerge(
-                          "text-[10px] text-center",
-                          form.heightUnit === "ft"
-                            ? "text-[#FDFDFF]"
-                            : "text-[#142939]"
-                        )}
-                      >
-                        Ft
-                      </Text>
-                    </TouchableOpacity>
-                  </View>
                 </View>
-
-                {errors.height ? (
-                  <Text className="text-red-500 text-sm ml-2">
-                    {errors.height}
-                  </Text>
-                ) : null}
+                {errors.height ? <Text className="text-red-500 text-sm ml-2">{errors.height}</Text> : null}
               </View>
+
             </View>
           </View>
         )}
@@ -767,7 +679,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.goal === "lose weight" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -793,7 +705,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.goal === "gain muscle" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -819,7 +731,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.goal === "maintain weight" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -870,7 +782,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.equipment === "None" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -903,7 +815,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.equipment === "Full Gym" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -936,7 +848,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.equipment === "Dumbbell" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -979,7 +891,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "sedentary" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1008,7 +920,7 @@ const Question = () => {
                         classes.rounded,
 
                         form.activity === "lightly active" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1020,7 +932,7 @@ const Question = () => {
                       classes.boxRounded2,
                       "text-wrap pr-10 pl-4 w-[300px]",
                       form.activity === "moderately active" &&
-                        "border-[#FDFDFF]"
+                      "border-[#FDFDFF]"
                     )}
                     onPress={() =>
                       onChangeForm("activity", "moderately active")
@@ -1030,7 +942,7 @@ const Question = () => {
                       className={twMerge(
                         classes.text,
                         form.activity === "moderately active" &&
-                          "text-[#FDFDFF]"
+                        "text-[#FDFDFF]"
                       )}
                     >
                       Moderately active (moderate exercise or sports 3-5
@@ -1040,7 +952,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "moderately active" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1067,7 +979,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "very active" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1094,7 +1006,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.activity === "extra active" &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1136,7 +1048,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 1 &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1163,7 +1075,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 2 &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1190,7 +1102,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 3 &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1217,7 +1129,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 4 &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1244,7 +1156,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 5 &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>
@@ -1271,7 +1183,7 @@ const Question = () => {
                       className={twMerge(
                         classes.rounded,
                         form.workoutDay === 6 &&
-                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
                       )}
                     ></View>
                   </TouchableOpacity>

@@ -2,8 +2,6 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
-  Keyboard,
-  TouchableWithoutFeedback,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -69,7 +67,6 @@ const NutritionPlanScreen = () => {
       return;
     }
 
-    // Only proceed if auth is ready and user matches
     if (FIREBASE_AUTH.currentUser.uid !== userId) {
       console.warn("Auth not ready or mismatched user");
       return;
@@ -90,7 +87,7 @@ const NutritionPlanScreen = () => {
       setDailyFat(data.fat ?? 0);
       setDailyTotalCalories(data.calories ?? 0);
     } else {
-        // It's a new day — reset by creating new document
+        // If new day reset by creating new document
         await setDoc(dietlogRef, {
           protein: 0,
           carbs: 0,
@@ -430,8 +427,7 @@ const handleSaveIntake = async (
     );
   }
 
-  return (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+  return (    
       <View className="flex-1 py-4 bg-[#84BDEA] px-4">
         <View className="flex-row justify-between items-center">
           <View>
@@ -529,7 +525,6 @@ const handleSaveIntake = async (
         <EditNutritionPlanBottomSheet ref={editPlanRef} onUpdate={handleUpdatePlan} />
         <TodayIntakeBottomSheet ref={todaymodalref}/>
       </View>
-    </TouchableWithoutFeedback>
   );
 };
 
