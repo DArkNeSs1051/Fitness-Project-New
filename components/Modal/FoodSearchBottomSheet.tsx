@@ -10,7 +10,6 @@ import {
   View,
   Text,
   TextInput,
-  FlatList,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
@@ -18,7 +17,7 @@ import {
 import {
   BottomSheetModal,
   BottomSheetBackdrop,
-  BottomSheetView,
+  BottomSheetFlatList,
 } from '@gorhom/bottom-sheet';
 import { Ionicons } from '@expo/vector-icons';
 import { FIRESTORE_DB } from '~/firebase';
@@ -37,10 +36,7 @@ type Food = {
 };
 
 type SelectedFood = Food & { quantity: number };
-
-type Props = {
-  onSelect: (foods: SelectedFood[]) => void;
-};
+type Props = { onSelect: (foods: SelectedFood[]) => void; };
 
 export type FoodSearchBottomSheetRef = {
   present: () => void;
@@ -77,7 +73,7 @@ const toCategoryId = (raw?: string): Exclude<Category, 'all'> | null => {
 
 const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(
   ({ onSelect }, ref) => {
-    const bottomSheetRef = useRef<BottomSheetModal>(null);
+    const sheetRef = useRef<BottomSheetModal>(null);
     const [foods, setFoods] = useState<Food[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -90,8 +86,8 @@ const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(
     const userId = user?.id;
 
     useImperativeHandle(ref, () => ({
-      present: () => bottomSheetRef.current?.present(),
-      dismiss: () => bottomSheetRef.current?.dismiss(),
+      present: () => sheetRef.current?.present(),
+      dismiss: () => sheetRef.current?.dismiss(),
     }));
 
     useEffect(() => {
@@ -116,12 +112,10 @@ const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(
         const foodCatId = toCategoryId(f.category);
         const matchesCategory =
           selectedCategory === 'all' || foodCatId === selectedCategory;
-
         const matchesSearch =
           s === '' ||
           f.name_en?.toLowerCase().includes(s) ||
           f.name_th?.toLowerCase().includes(s);
-
         return matchesCategory && matchesSearch;
       });
     }, [foods, search, selectedCategory]);
@@ -160,167 +154,191 @@ const FoodSearchBottomSheet = forwardRef<FoodSearchBottomSheetRef, Props>(
         Alert.alert('Error', 'User not authenticated');
         return;
       }
-      onSelect(selectedFoods); 
+      onSelect(selectedFoods);
       setSelectedFoods([]);
-      bottomSheetRef.current?.dismiss();
+      sheetRef.current?.dismiss();
     };
+
+    const Header = (
+      <View className="px-4 pt-2 pb-3">
+        <Text className="text-xl font-bold mb-4 text-center">Search Food</Text>
+        <TextInput
+          placeholder="Search food..."
+          placeholderTextColor="#999"
+          value={search}
+          onChangeText={setSearch}
+          className="border p-3 rounded-md mb-3"
+        />
+        <View className="flex-row flex-wrap mb-1">
+          {categories.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              className={`px-3 py-2 m-1 rounded-lg ${
+                selectedCategory === cat.id ? 'bg-[#5FA3D6]' : 'bg-gray-200'
+              }`}
+              onPress={() => setSelectedCategory(cat.id as Category)}
+            >
+              <Text
+                className={`${
+                  selectedCategory === cat.id ? 'text-white' : 'text-gray-700'
+                }`}
+              >
+                {cat.name}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {loading && (
+          <View className="items-center my-3">
+            <ActivityIndicator size="large" color="#5FA3D6" />
+          </View>
+        )}
+        {!!error && !loading && (
+          <Text className="text-red-500 text-center my-2">{error}</Text>
+        )}
+      </View>
+    );
+
+    const Footer =
+      selectedFoods.length === 0 ? (
+        <View style={{ height: 16 }} />
+      ) : (
+        <View className="px-4 pt-6 pb-8 border-t mt-4">
+          <Text className="font-bold mb-2 text-lg">Selected Foods</Text>
+
+          {selectedFoods.map((food, index) => (
+            <View
+              key={`${food.name_en}-${index}`}
+              className="flex-row justify-between items-center mb-2"
+            >
+              <View className="flex-1">
+                <Text className="text-sm text-gray-700">
+                  • {food.name_en} ({(food.calories * food.quantity).toFixed(0)} kcal)
+                </Text>
+              </View>
+
+              <View className="flex-row items-center">
+                <TouchableOpacity
+                  onPress={() => {
+                    if (food.quantity === 1) {
+                      handleRemoveFood(index);
+                    } else {
+                      setSelectedFoods((prev) => {
+                        const updated = [...prev];
+                        updated[index].quantity -= 1;
+                        return updated;
+                      });
+                    }
+                  }}
+                  className="bg-gray-300 px-2 rounded mx-1"
+                >
+                  <Text className="text-lg font-bold">−</Text>
+                </TouchableOpacity>
+
+                <Text className="text-md font-bold w-5 text-center">
+                  {food.quantity}
+                </Text>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedFoods((prev) => {
+                      const updated = [...prev];
+                      updated[index].quantity += 1;
+                      return updated;
+                    });
+                  }}
+                  className="bg-gray-300 px-2 rounded mx-1"
+                >
+                  <Text className="text-lg font-bold">+</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity onPress={() => handleRemoveFood(index)} className="ml-2">
+                  <Ionicons name="trash" size={20} color="red" />
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+
+          <View className="bg-[#d4dde4] rounded-md p-2 mt-2">
+            <Text className="text-black font-bold text-md">
+              Total Protein: {totals.protein.toFixed(1)}g | Carbs: {totals.carbs.toFixed(1)}g | Fat: {totals.fat.toFixed(1)}g
+            </Text>
+            <Text className="text-black font-bold text-lg">
+              Total Calories: {totals.calories.toFixed(0)}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            className="bg-[#5FA3D6] p-3 rounded-md mt-4"
+            onPress={handleConfirmSelection}
+          >
+            <Text className="text-white font-bold text-center">
+              Add Intake ({selectedFoods.length})
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
 
     return (
       <BottomSheetModal
-        ref={bottomSheetRef}
+        ref={sheetRef}
         snapPoints={snapPoints}
         backdropComponent={(props) => (
-          <BottomSheetBackdrop {...props} disappearsOnIndex={-1} appearsOnIndex={0} />
+          <BottomSheetBackdrop
+            {...props}
+            disappearsOnIndex={-1}
+            appearsOnIndex={0}
+          />
         )}
         android_keyboardInputMode="adjustResize"
         enablePanDownToClose
         enableDismissOnClose
       >
-        <BottomSheetView className="px-4 py-2 flex-1">
-          <Text className="text-xl font-bold mb-4 text-center">Search Food</Text>
-
-
-          <TextInput
-            placeholder="Search food..."
-            placeholderTextColor="#999"
-            value={search}
-            onChangeText={setSearch}
-            className="border p-3 rounded-md mb-3"
-          />
-
-          <View className="flex-row flex-wrap mb-3">
-            {categories.map((cat) => (
-              <TouchableOpacity
-                key={cat.id}
-                className={`px-3 py-2 m-1 rounded-lg ${
-                  selectedCategory === cat.id ? 'bg-[#5FA3D6]' : 'bg-gray-200'
-                }`}
-                onPress={() => setSelectedCategory(cat.id as Category)}
-              >
-                <Text
-                  className={`${
-                    selectedCategory === cat.id ? 'text-white' : 'text-gray-700'
-                  }`}
-                >
-                  {cat.name}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {loading ? (
-            <ActivityIndicator size="large" color="#5FA3D6" className="mt-4" />
-          ) : error ? (
-            <Text className="text-red-500 text-center">{error}</Text>
-          ) : (
-            <FlatList
-              data={filteredFoods}
-              keyExtractor={(item) => item.name_en}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  onPress={() => handleSelectFood(item)}
-                  className="py-3 px-2 border-b border-gray-200"
-                >
-                  <View className="flex-row justify-between items-start">
-                    <View style={{ flexShrink: 1 }} className="pr-2">
-                      <Text className="font-bold text-[#142939] text-lg" numberOfLines={2}>
-                        {item.name_en}
-                      </Text>
-                      <Text className="font-bold text-[#142939] text-md" numberOfLines={2}>
-                        {item.name_th}
-                      </Text>
-                      {!!item.category && (
-                        <Text className="text-gray-500 text-xs mt-1">{item.category}</Text>
-                      )}
-                    </View>
-                    <Text className="font-bold text-[#142939] text-lg" style={{ textAlign: 'right' }}>
-                      {item.serving_size}
-                    </Text>
-                  </View>
-
-                  <Text className="text-gray-600 text-sm mt-1">
-                    Protein: {item.protein}g | Carbs: {item.carbs}g | Fat: {item.fat}g | Calories: {item.calories}
+        <BottomSheetFlatList
+          data={loading || error ? [] : filteredFoods}
+          keyExtractor={(item) => item.name_en}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              onPress={() => handleSelectFood(item)}
+              className="py-3 px-4 border-b border-gray-200"
+            >
+              <View className="flex-row justify-between items-start">
+                <View style={{ flexShrink: 1 }} className="pr-2">
+                  <Text className="font-bold text-[#142939] text-lg" numberOfLines={2}>
+                    {item.name_en}
                   </Text>
-                </TouchableOpacity>
-              )}
-              ListEmptyComponent={
-                <Text className="text-center text-gray-500 mt-4">
-                  No foods found for “{search || '—'}” in {CATEGORY_LABEL[selectedCategory]}
-                </Text>
-              }
-              showsVerticalScrollIndicator={false}
-            />
-          )}
-
-          {selectedFoods.length > 0 && (
-            <View className="mt-6 border-t pt-4">
-              <Text className="font-bold mb-2 text-lg">Selected Foods</Text>
-
-              {selectedFoods.map((food, index) => (
-                <View key={`${food.name_en}-${index}`} className="flex-row justify-between items-center mb-2">
-                  <View className="flex-1">
-                    <Text className="text-sm text-gray-700">
-                      • {food.name_en} ({(food.calories * food.quantity).toFixed(0)} kcal)
-                    </Text>
-                  </View>
-
-                  <View className="flex-row items-center">
-                    <TouchableOpacity
-                      onPress={() => {
-                        if (food.quantity === 1) {
-                          handleRemoveFood(index);
-                        } else {
-                          setSelectedFoods((prev) => {
-                            const updated = [...prev];
-                            updated[index].quantity -= 1;
-                            return updated;
-                          });
-                        }
-                      }}
-                      className="bg-gray-300 px-2 rounded mx-1"
-                    >
-                      <Text className="text-lg font-bold">−</Text>
-                    </TouchableOpacity>
-
-                    <Text className="text-md font-bold w-5 text-center">{food.quantity}</Text>
-
-                    <TouchableOpacity
-                      onPress={() => {
-                        setSelectedFoods((prev) => {
-                          const updated = [...prev];
-                          updated[index].quantity += 1;
-                          return updated;
-                        });
-                      }}
-                      className="bg-gray-300 px-2 rounded mx-1"
-                    >
-                      <Text className="text-lg font-bold">+</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity onPress={() => handleRemoveFood(index)} className="ml-2">
-                      <Ionicons name="trash" size={20} color="red" />
-                    </TouchableOpacity>
-                  </View>
+                  <Text className="font-bold text-[#142939] text-md" numberOfLines={2}>
+                    {item.name_th}
+                  </Text>
+                  {!!item.category && (
+                    <Text className="text-gray-500 text-xs mt-1">{item.category}</Text>
+                  )}
                 </View>
-              ))}
-
-              <View className="bg-[#d4dde4] rounded-md p-2 mt-2">
-                <Text className="text-black font-bold text-md">
-                  Total Protein: {totals.protein.toFixed(1)}g | Carbs: {totals.carbs.toFixed(1)}g | Fat: {totals.fat.toFixed(1)}g
-                </Text>
-                <Text className="text-black font-bold text-lg">
-                  Total Calories: {totals.calories.toFixed(0)}
+                <Text className="font-bold text-[#142939] text-lg" style={{ textAlign: 'right' }}>
+                  {item.serving_size}
                 </Text>
               </View>
 
-              <TouchableOpacity className="bg-[#5FA3D6] p-3 rounded-md mt-4" onPress={handleConfirmSelection}>
-                <Text className="text-white font-bold text-center">
-                  Add Intake ({selectedFoods.length})
-                </Text>
-              </TouchableOpacity>
-            </View>
+              <Text className="text-gray-600 text-sm mt-1">
+                Protein: {item.protein}g | Carbs: {item.carbs}g | Fat: {item.fat}g | Calories: {item.calories}
+              </Text>
+            </TouchableOpacity>
           )}
-        </BottomSheetView>
+          ListHeaderComponent={Header}
+          ListFooterComponent={Footer}
+          ListEmptyComponent={
+            !loading && !error ? (
+              <Text className="text-center text-gray-500 mt-8">
+                No foods found for “{search || '—'}” in {CATEGORY_LABEL[selectedCategory]}
+              </Text>
+            ) : null
+          }
+          keyboardDismissMode="on-drag"
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ paddingBottom: 24 }}
+        />
       </BottomSheetModal>
     );
   }
