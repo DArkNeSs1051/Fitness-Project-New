@@ -9,13 +9,13 @@ import dayjs from "dayjs";
 type Day = { exercises: RoutineExercise[]; completed: boolean; title?: string };
 
 interface RoutineStore {
-  ownerId: string | null;                              
+  ownerId: string | null;
   workouts: Record<string, Day>;
   selectedDate: string;
   loading: boolean;
   error?: string | null;
   setSelectedDate: (date: string) => void;
-  reset: () => void;                                  
+  reset: () => void;
   fetchRoutineFromFirestore: (userId: string) => Promise<void>;
   saveDayRoutine: (userId: string, date: string) => Promise<void>;
   addExercise: (userId: string, exercise: RoutineExercise) => void;
@@ -104,11 +104,24 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     if (ownerId && ownerId !== userId) {
       set({ ownerId: userId, workouts: {}, selectedDate: dayjs().format("YYYY-MM-DD") });
     }
-    const day = workouts[selectedDate] ?? { exercises: [], completed: false };
-    const next = { ...workouts, [selectedDate]: { ...day, exercises: [...day.exercises, exercise] } };
-    set({ workouts: next });
+
+    const prevDay: Day =
+      workouts[selectedDate] ?? { exercises: [], completed: false, title: "" };
+
+    // If this day was a Rest Day, rename it. 
+    const wasRestDay =
+      typeof prevDay.title === "string" && /rest\s*day/i.test(prevDay.title);
+
+    const nextDay: Day = {
+      ...prevDay,
+      title: wasRestDay ? "Custom Workout" : (prevDay.title || "Custom Workout"),
+      exercises: [...prevDay.exercises, exercise],
+    };
+
+    set({ workouts: { ...workouts, [selectedDate]: nextDay } });
     saveDayRoutine(userId, selectedDate);
   },
+
 
   editExercise: (userId, exerciseId, updates) => {
     const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
@@ -123,12 +136,23 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
   deleteExercise: (userId, exerciseId) => {
     const { workouts, selectedDate, saveDayRoutine, ownerId } = get();
     if (ownerId && ownerId !== userId) return;
+
     const day = workouts[selectedDate];
     if (!day) return;
+
     const filtered = day.exercises.filter((ex) => ex.id !== exerciseId);
-    set({ workouts: { ...workouts, [selectedDate]: { ...day, exercises: filtered } } });
+
+    const next: Day = {
+      ...day,
+      exercises: filtered,
+      title: filtered.length === 0 ? "Rest Day" : (day.title || "Custom Workout"),
+      completed: filtered.length === 0 ? false : day.completed,
+    };
+
+    set({ workouts: { ...workouts, [selectedDate]: next } });
     saveDayRoutine(userId, selectedDate);
   },
+
 
   reorderExercises: (userId, newExercises) => {
     const { workouts, selectedDate, saveDayRoutine, ownerId } = get();

@@ -123,13 +123,13 @@ const AddExerciseModal = forwardRef<AddExerciseModalRef, Props>(
           {renderFilterChips(equipmentTypes, selectedEquipment, setSelectedEquipment)}
 
           {filteredExercises.map((item) => {
-            const preview = libToRoutine(item); // compute defaults for display
+            const preview = libToRoutine(item); 
             return (
               <TouchableOpacity
                 key={item.id}
                 style={styles.exerciseItem}
                 onPress={() => {
-                  onSelectExercise(preview);      // return routine-ready item
+                  onSelectExercise(preview);      
                   bottomSheetModalRef.current?.dismiss();
                 }}
               >

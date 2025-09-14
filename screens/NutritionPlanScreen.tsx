@@ -181,6 +181,7 @@ const handleSaveIntake = async (
   carbs: number,
   fat: number,
   calories?: number,
+  type = 'manual',
   name = 'Manual Intake' 
 ) => {
   if (!userId) {
@@ -206,6 +207,7 @@ const handleSaveIntake = async (
         protein,
         carbs,
         fat,
+        type,
         calories: finalCalories,
       },
     ];

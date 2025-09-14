@@ -147,17 +147,17 @@ const Question = () => {
 
       switch (key) {
         case "gender":
-          newErrors.gender = value ? "" : "กรุณาเลือกเพศ";
+          newErrors.gender = value ? "" : "Please choose you gender";
           break;
         case "weight":
           newErrors.weight = /^\d+$/.test(String(value))
             ? ""
-            : "กรุณากรอกน้ำหนักเป็นตัวเลข";
+            : "Pleas input your weight(kg)";
           break;
         case "height":
           newErrors.height = /^\d+$/.test(String(value))
             ? ""
-            : "กรุณากรอกส่วนสูงเป็นตัวเลข";
+            : "Please input your height(cm)";
           break;
       }
 
@@ -787,7 +787,7 @@ const Question = () => {
                     ></View>
                   </TouchableOpacity>
                 </View>
-                <View className="h-[60px]">
+                {/* <View className="h-[60px]">
                   <TouchableOpacity
                     activeOpacity={1}
                     className={twMerge(
@@ -819,7 +819,7 @@ const Question = () => {
                       )}
                     ></View>
                   </TouchableOpacity>
-                </View>
+                </View> */}
                 <View className="h-[60px]">
                   <TouchableOpacity
                     activeOpacity={1}
@@ -1025,7 +1025,7 @@ const Question = () => {
             </View>
             <View className="flex flex-col gap-5">
               <Text className={classes.text}>Select the day</Text>
-              <View className="flex flex-col gap-10 items-center justify-center">
+              <View className="flex flex-col gap-4 items-center justify-center">
                 <View className="h-[60px]">
                   <TouchableOpacity
                     activeOpacity={1}
