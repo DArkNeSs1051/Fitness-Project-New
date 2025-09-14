@@ -470,7 +470,7 @@ const RoutineScreen = () => {
         </View>
 
         {currentWorkoutList.length > 0 ? (
-          <View className="bg-[#315D80] rounded-lg p-3 max-h-[350]">
+          <ScrollView showsVerticalScrollIndicator={false} className="bg-[#315D80] rounded-lg p-3 max-h-[350]">
             <View className="flex-row items-center pb-2 border-b border-gray-400">
               {isEditing && <View style={{ width: 28 }} />}
               <Text className="text-white font-bold flex-1">Exercise</Text>
@@ -480,12 +480,12 @@ const RoutineScreen = () => {
               <Text className="text-white font-bold flex-[0.6] text-center">Rest</Text>
               {isEditing && <View style={{ width: 50 }} />}
             </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
+            <View >
               {currentWorkoutList.map((item) => (
                 <DraggableItem key={item.id} item={item} />
               ))}
-            </ScrollView>
-          </View>
+            </View>
+          </ScrollView>
         ) : (
           <Text className="text-white text-center mt-3 italic">
             No exercises today. Tap "Edit" to add exercises

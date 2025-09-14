@@ -12,6 +12,7 @@ import {
   FlatList,
   ActivityIndicator,
   Alert,
+  Dimensions,
 } from 'react-native';
 import {
   BottomSheetModal,
@@ -21,9 +22,10 @@ import {
 import { useUser } from '@clerk/clerk-expo';
 import { FIRESTORE_DB } from '~/firebase';
 import { doc, getDoc } from 'firebase/firestore';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, FontAwesome6 } from '@expo/vector-icons';
 import dayjs from 'dayjs';
 
+const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 export type TodayIntakeBottomSheetRef = {
   present: () => void;
   dismiss: () => void;
@@ -42,7 +44,7 @@ type FoodEntry = {
 
 const TodayIntakeBottomSheet = forwardRef<TodayIntakeBottomSheetRef>((_, ref) => {
   const bottomSheetRef = useRef<BottomSheetModal>(null);
-  const snapPoints = useMemo(() => ['80%'], []);
+  const snapPoints = useMemo(() => ['90%'], []);
   const { user } = useUser();
   const userId = user?.id;
 
@@ -101,21 +103,31 @@ const TodayIntakeBottomSheet = forwardRef<TodayIntakeBottomSheetRef>((_, ref) =>
     }
   };
 
-  const getCategoryIcon = (category?: string): keyof typeof Ionicons.glyphMap => {
-  switch (category?.toLowerCase()) {
-    case 'main dish':
-      return 'restaurant';
-    case 'fruit':
-      return 'nutrition';
-    case 'dessert':
-      return 'ice-cream';
-    case 'grains':
-      return 'leaf';
-    default:
-      return 'help-circle-outline';
+  const iconFor = (category?: string) => {
+  const c = (category || '').toLowerCase();
+
+  if (c === 'grains') {
+    return <FontAwesome6 name="bowl-rice" size={20} color="#5FA3D6" />;
   }
+    if (c === 'manual') {
+    return <FontAwesome6 name="pencil" size={20} color="#5FA3D6" />;
+  }
+  if (c === 'main dish') {
+    return <Ionicons name="restaurant" size={20} color="#5FA3D6" />;
+  }
+  if (c === 'fruit') {
+    return <Ionicons name="nutrition" size={20} color="#5FA3D6" />;
+  }
+  if (c === 'dessert') {
+    return <Ionicons name="ice-cream" size={20} color="#5FA3D6" />;
+  }
+  return <Ionicons name="help-circle-outline" size={20} color="#5FA3D6" />;
 };
 
+    const bottomSheetHeight = SCREEN_HEIGHT * 0.9;
+    const headerHeight = 180; 
+    const footerHeight = entries.length > 0 ? 250 : 0; 
+    const availableHeight = bottomSheetHeight - headerHeight - footerHeight - 20; 
 
   return (
     <BottomSheetModal
@@ -136,26 +148,23 @@ const TodayIntakeBottomSheet = forwardRef<TodayIntakeBottomSheetRef>((_, ref) =>
         ) : error ? (
           <Text className="text-center text-red-500">{error}</Text>
         ) : entries.length === 0 ? (
-          <View className='flex-1 justify-center items-center'>
+          <View className="flex-1 justify-center items-center">
             <Text className="text-center text-gray-500">No food logged for today.</Text>
           </View>
         ) : (
           <>
             <FlatList
               data={entries}
+              style={{ flex: 1, height: Math.max(availableHeight, 200) }}
               keyExtractor={(item) => item.id}
               renderItem={({ item }) => (
                 <View className="mb-3 border-b pb-2 border-gray-200">
                   <View className="flex-row justify-between items-center">
-                        <Text className="font-bold text-[#142939] text-base">{item.name}</Text>
-                        <Ionicons
-                        name={getCategoryIcon(item.type)}
-                        size={20}
-                        color="#5FA3D6"
-                        />
-                    </View>
+                    <Text className="font-bold text-[#142939] text-base">{item.name}</Text>
+                    {iconFor(item.type)}
+                  </View>
                   <Text className="text-sm text-gray-700">
-                    Quantity: {item.quantity} | Calories: {(item.calories).toFixed(0)} kcal
+                    Quantity: {item.quantity} | Calories: {item.calories.toFixed(0)} kcal
                   </Text>
                   <Text className="text-sm text-gray-500">
                     Protein: {item.protein.toFixed(1)}g | Carbs: {item.carbs.toFixed(1)}g | Fat: {item.fat.toFixed(1)}g
