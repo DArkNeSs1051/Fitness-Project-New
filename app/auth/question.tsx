@@ -15,6 +15,7 @@ import OpenAI from "openai";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -362,432 +363,442 @@ const Question = () => {
       </Text>
     </View>
   ) : (
-    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-      <View className={twMerge("flex-1 gap-5 bg-[#84BDEA]")}>
-        <View className="h-[70px] flex flex-row justify-center items-center px-5 relative">
-          {states !== 1 && (
-            <View className="absolute left-5">
-              <Arrow onPress={handlePrevState} />
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 20}
+    >
+      <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+        <View className={twMerge("flex-1 gap-5 bg-[#84BDEA]")}>
+          <View className="h-[70px] flex flex-row justify-center items-center px-5 relative">
+            {states !== 1 && (
+              <View className="absolute left-5">
+                <Arrow onPress={handlePrevState} />
+              </View>
+            )}
+            <Text className="text-[#142939]">
+              {states}/{maxStates}
+            </Text>
+          </View>
+          {/* States 1 */}
+          {states === 1 && (
+            <ScrollView
+              className={classes.container}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              <View className="flex flex-col gap-1">
+                <Text className={classes.title}>Hello {user?.fullName}!</Text>
+                <Text className={classes.text}>Tell us more about yourself</Text>
+              </View>
+              <View className="flex flex-col gap-3">
+                <Text className={classes.text}>Select your gender</Text>
+                <View className="flex flex-row gap-8 items-center justify-center">
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    className={twMerge(
+                      classes.boxRounded,
+                      errors.gender && "border-red-500",
+                      form.gender === "male" && "border-[#FDFDFF]"
+                    )}
+                    onPress={() => onChangeForm("gender", "male")}
+                  >
+                    {form.gender === "male" ? <MaleIconWhite /> : <MaleIcon />}
+                    <Text
+                      className={twMerge(
+                        classes.text,
+                        form.gender === "male" && "text-[#FDFDFF]"
+                      )}
+                    >
+                      Male
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    activeOpacity={1}
+                    className={twMerge(
+                      classes.boxRounded,
+                      errors.gender && "border-red-500",
+                      form.gender === "female" && "border-[#FDFDFF]"
+                    )}
+                    onPress={() => onChangeForm("gender", "female")}
+                  >
+                    {form.gender === "female" ? (
+                      <FemaleIconWhite />
+                    ) : (
+                      <FemaleIcon />
+                    )}
+
+                    <Text
+                      className={twMerge(
+                        classes.text,
+                        form.gender === "female" && "text-[#FDFDFF]"
+                      )}
+                    >
+                      Female
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View className="flex items-center">
+                  {errors.gender ? (
+                    <Text className="text-red-500 text-sm ml-2">
+                      {errors.gender}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+              <View className="flex flex-col gap-3">
+                {/* Age */}
+                <View className="flex flex-col h-[100px]">
+                  <View className="flex flex-row items-center justify-between">
+                    <Text>Age: {form.age ? `${form.age} Year` : "-"}</Text>
+                    <TouchableOpacity>
+                      <Ionicons
+                        name="calendar-outline"
+                        size={25}
+                        color="#142939"
+                        onPress={() => setshowDatePicker(true)}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                  {errors.birthday ? (
+                    <Text className="text-red-500 text-sm ml-2">
+                      {errors.birthday}
+                    </Text>
+                  ) : null}
+                </View>
+                {showDatePicker && (
+                  <>
+                    {/* Android: show inline picker */}
+                    {Platform.OS === "android" && (
+                      <DateTimePicker
+                        value={form.birthday ?? new Date()}
+                        mode="date"
+                        display="default"
+                        onChange={handleDateChange}
+                        maximumDate={new Date()}
+                        minimumDate={new Date(1900, 0, 1)}
+                        themeVariant="light"
+                      />
+                    )}
+
+                    {/* iOS: show modal */}
+                    {Platform.OS === "ios" && (
+                      <Modal
+                        transparent
+                        animationType="fade"
+                        visible={showDatePicker}
+                        onRequestClose={() => setshowDatePicker(false)}
+                      >
+                        <View style={styles.modalOverlay}>
+                          <View style={styles.datePickerModalContent}>
+                            <View style={styles.modalHeader}>
+                              <TouchableOpacity
+                                onPress={() => setshowDatePicker(false)}
+                              >
+                                <Text style={styles.modalButtonText}>Cancel</Text>
+                              </TouchableOpacity>
+                              <Text style={styles.modalTitle}>
+                                Select Birthdate
+                              </Text>
+                              <TouchableOpacity
+                                onPress={() => handleDateConfirm(tempDate)}
+                              >
+                                <Text
+                                  style={[
+                                    styles.modalButtonText,
+                                    styles.doneButton,
+                                  ]}
+                                >
+                                  Done
+                                </Text>
+                              </TouchableOpacity>
+                            </View>
+                            <DateTimePicker
+                              value={tempDate}
+                              mode="date"
+                              display="spinner"
+                              onChange={handleDateChange}
+                              maximumDate={new Date()}
+                              minimumDate={new Date(1900, 0, 1)}
+                              themeVariant="light"
+                              style={styles.dateTimePicker}
+                            />
+                          </View>
+                        </View>
+                      </Modal>
+                    )}
+                  </>
+                )}
+
+                {/* Weight (kg) */}
+                <View className="flex flex-col h-[100px]">
+                  <View className="flex flex-row items-center">
+                    <TextInput
+                      placeholder="Weight (kg)"
+                      placeholderTextColor="#42779F"
+                      className={twMerge(classes.commonInputStyle, errors.weight && "border-red-500")}
+                      keyboardType="numeric"
+                      value={form.weight}
+                      onChangeText={(text) => onChangeForm("weight", text)}
+                    />
+                  </View>
+                  {errors.weight ? <Text className="text-red-500 text-sm ml-2">{errors.weight}</Text> : null}
+                </View>
+
+                {/* Height (cm) */}
+                <View className="flex flex-col h-[100px]">
+                  <View className="flex flex-row items-center">
+                    <TextInput
+                      placeholder="Height (cm)"
+                      placeholderTextColor="#42779F"
+                      className={twMerge(classes.commonInputStyle, errors.height && "border-red-500")}
+                      keyboardType="numeric"
+                      value={form.height}
+                      onChangeText={(text) => onChangeForm("height", text)}
+                    />
+                  </View>
+                  {errors.height ? <Text className="text-red-500 text-sm ml-2">{errors.height}</Text> : null}
+                </View>
+
+              </View>
+
+            </ScrollView>
+          )}
+          {/* States 2 */}
+          {states === 2 && (
+            // <View className={classes.container}>
+            //   <View className="flex flex-col gap-1">
+            //     <Text className={classes.title}>What level are you in ?</Text>
+            //   </View>
+
+            //   <View className="flex flex-col gap-5">
+            //     <Text className={classes.text}>Select your level</Text>
+            //     <View className="flex flex-col gap-10 items-center justify-center pt-10">
+            //       <View className="h-[60px]">
+            //         <TouchableOpacity
+            //           activeOpacity={1}
+            //           className={twMerge(
+            //             classes.boxRounded2,
+            //             form.level === "beginner" && "border-[#FDFDFF]"
+            //           )}
+            //           onPress={() => onChangeForm("level", "beginner")}
+            //         >
+            //           <Text
+            //             className={twMerge(
+            //               classes.text,
+            //               form.level === "beginner" && "text-[#FDFDFF]"
+            //             )}
+            //           >
+            //             Beginner
+            //           </Text>
+            //           <View
+            //             className={twMerge(
+            //               classes.rounded,
+            //               form.level === "beginner" &&
+            //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+            //             )}
+            //           ></View>
+            //         </TouchableOpacity>
+            //       </View>
+            //       <View className="h-[60px]">
+            //         <TouchableOpacity
+            //           activeOpacity={1}
+            //           className={twMerge(
+            //             classes.boxRounded2,
+            //             form.level === "intermediate" && "border-[#FDFDFF]"
+            //           )}
+            //           onPress={() => onChangeForm("level", "intermediate")}
+            //         >
+            //           <Text
+            //             className={twMerge(
+            //               classes.text,
+            //               form.level === "intermediate" && "text-[#FDFDFF]"
+            //             )}
+            //           >
+            //             Intermediate
+            //           </Text>
+            //           <View
+            //             className={twMerge(
+            //               classes.rounded,
+            //               form.level === "intermediate" &&
+            //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+            //             )}
+            //           ></View>
+            //         </TouchableOpacity>
+            //       </View>
+            //       <View className="h-[60px]">
+            //         <TouchableOpacity
+            //           activeOpacity={1}
+            //           className={twMerge(
+            //             classes.boxRounded2,
+            //             form.level === "advance" && "border-[#FDFDFF]"
+            //           )}
+            //           onPress={() => onChangeForm("level", "advance")}
+            //         >
+            //           <Text
+            //             className={twMerge(
+            //               classes.text,
+            //               form.level === "advance" && "text-[#FDFDFF]"
+            //             )}
+            //           >
+            //             Advance
+            //           </Text>
+            //           <View
+            //             className={twMerge(
+            //               classes.rounded,
+            //               form.level === "advance" &&
+            //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+            //             )}
+            //           ></View>
+            //         </TouchableOpacity>
+            //       </View>
+            //     </View>
+            //   </View>
+            // </View>
+            <FitnessTestScreen onHideArrow form={form} />
+          )}
+          {/* States 3 */}
+          {states === 3 && (
+            <View className={classes.container}>
+              <View className="flex flex-col gap-1">
+                <Text className={classes.title}>What Your Fitness Goal ?</Text>
+              </View>
+              <View className="flex items-center justify-center">
+                <FitnessGoal />
+              </View>
+              <View className="flex flex-col gap-5">
+                <Text className={classes.text}>Select your Goal</Text>
+                <View className="flex flex-col gap-10 items-center justify-center pt-10">
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        form.goal === "lose weight" && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("goal", "lose weight")}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.goal === "lose weight" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Lose weight
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.goal === "lose weight" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        form.goal === "gain muscle" && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("goal", "gain muscle")}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.goal === "gain muscle" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Gain Muscle
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.goal === "gain muscle" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        form.goal === "maintain weight" && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("goal", "maintain weight")}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.goal === "maintain weight" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Maintain Weight
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.goal === "maintain weight" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
             </View>
           )}
-          <Text className="text-[#142939]">
-            {states}/{maxStates}
-          </Text>
-        </View>
-        {/* States 1 */}
-        {states === 1 && (
-          <View className={classes.container}>
-            <View className="flex flex-col gap-1">
-              <Text className={classes.title}>Hello {user?.fullName}!</Text>
-              <Text className={classes.text}>Tell us more about yourself</Text>
-            </View>
-            <View className="flex flex-col gap-3">
-              <Text className={classes.text}>Select your gender</Text>
-              <View className="flex flex-row gap-8 items-center justify-center">
-                <TouchableOpacity
-                  activeOpacity={1}
-                  className={twMerge(
-                    classes.boxRounded,
-                    errors.gender && "border-red-500",
-                    form.gender === "male" && "border-[#FDFDFF]"
-                  )}
-                  onPress={() => onChangeForm("gender", "male")}
-                >
-                  {form.gender === "male" ? <MaleIconWhite /> : <MaleIcon />}
-                  <Text
-                    className={twMerge(
-                      classes.text,
-                      form.gender === "male" && "text-[#FDFDFF]"
-                    )}
-                  >
-                    Male
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  activeOpacity={1}
-                  className={twMerge(
-                    classes.boxRounded,
-                    errors.gender && "border-red-500",
-                    form.gender === "female" && "border-[#FDFDFF]"
-                  )}
-                  onPress={() => onChangeForm("gender", "female")}
-                >
-                  {form.gender === "female" ? (
-                    <FemaleIconWhite />
-                  ) : (
-                    <FemaleIcon />
-                  )}
-
-                  <Text
-                    className={twMerge(
-                      classes.text,
-                      form.gender === "female" && "text-[#FDFDFF]"
-                    )}
-                  >
-                    Female
-                  </Text>
-                </TouchableOpacity>
+          {/* States 4 */}
+          {states === 4 && (
+            <View className={classes.container}>
+              <View className="flex flex-col gap-1">
+                <Text className={classes.title}>
+                  Where do you prefer to workout ?
+                </Text>
               </View>
-              <View className="flex items-center">
-                {errors.gender ? (
-                  <Text className="text-red-500 text-sm ml-2">
-                    {errors.gender}
-                  </Text>
-                ) : null}
+              <View className="flex items-center justify-center">
+                <Workout />
               </View>
-            </View>
-            <View className="flex flex-col gap-3">
-              {/* Age */}
-              <View className="flex flex-col h-[100px]">
-                <View className="flex flex-row items-center justify-between">
-                  <Text>Age: {form.age ? `${form.age} Year` : "-"}</Text>
-                  <TouchableOpacity>
-                    <Ionicons
-                      name="calendar-outline"
-                      size={25}
-                      color="#142939"
-                      onPress={() => setshowDatePicker(true)}
-                    />
-                  </TouchableOpacity>
-                </View>
-                {errors.birthday ? (
-                  <Text className="text-red-500 text-sm ml-2">
-                    {errors.birthday}
-                  </Text>
-                ) : null}
-              </View>
-              {showDatePicker && (
-                <>
-                  {/* Android: show inline picker */}
-                  {Platform.OS === "android" && (
-                    <DateTimePicker
-                      value={form.birthday ?? new Date()}
-                      mode="date"
-                      display="default"
-                      onChange={handleDateChange}
-                      maximumDate={new Date()}
-                      minimumDate={new Date(1900, 0, 1)}
-                      themeVariant="light"
-                    />
-                  )}
-
-                  {/* iOS: show modal */}
-                  {Platform.OS === "ios" && (
-                    <Modal
-                      transparent
-                      animationType="fade"
-                      visible={showDatePicker}
-                      onRequestClose={() => setshowDatePicker(false)}
+              <View className="flex flex-col gap-5">
+                <Text className={classes.text}>Select the place</Text>
+                <View className="flex flex-col gap-10 items-center justify-center pt-10">
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        form.equipment === "None" && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("equipment", "None")}
                     >
-                      <View style={styles.modalOverlay}>
-                        <View style={styles.datePickerModalContent}>
-                          <View style={styles.modalHeader}>
-                            <TouchableOpacity
-                              onPress={() => setshowDatePicker(false)}
-                            >
-                              <Text style={styles.modalButtonText}>Cancel</Text>
-                            </TouchableOpacity>
-                            <Text style={styles.modalTitle}>
-                              Select Birthdate
-                            </Text>
-                            <TouchableOpacity
-                              onPress={() => handleDateConfirm(tempDate)}
-                            >
-                              <Text
-                                style={[
-                                  styles.modalButtonText,
-                                  styles.doneButton,
-                                ]}
-                              >
-                                Done
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                          <DateTimePicker
-                            value={tempDate}
-                            mode="date"
-                            display="spinner"
-                            onChange={handleDateChange}
-                            maximumDate={new Date()}
-                            minimumDate={new Date(1900, 0, 1)}
-                            themeVariant="light"
-                            style={styles.dateTimePicker}
-                          />
-                        </View>
+                      <View className="absolute left-5">
+                        {form.equipment === "None" ? (
+                          <HomePreferIconWhite />
+                        ) : (
+                          <HomePreferIcon />
+                        )}
                       </View>
-                    </Modal>
-                  )}
-                </>
-              )}
-
-              {/* Weight (kg) */}
-              <View className="flex flex-col h-[100px]">
-                <View className="flex flex-row items-center">
-                  <TextInput
-                    placeholder="Weight (kg)"
-                    placeholderTextColor="#42779F"
-                    className={twMerge(classes.commonInputStyle, errors.weight && "border-red-500")}
-                    keyboardType="numeric"
-                    value={form.weight}
-                    onChangeText={(text) => onChangeForm("weight", text)}
-                  />
-                </View>
-                {errors.weight ? <Text className="text-red-500 text-sm ml-2">{errors.weight}</Text> : null}
-              </View>
-
-              {/* Height (cm) */}
-              <View className="flex flex-col h-[100px]">
-                <View className="flex flex-row items-center">
-                  <TextInput
-                    placeholder="Height (cm)"
-                    placeholderTextColor="#42779F"
-                    className={twMerge(classes.commonInputStyle, errors.height && "border-red-500")}
-                    keyboardType="numeric"
-                    value={form.height}
-                    onChangeText={(text) => onChangeForm("height", text)}
-                  />
-                </View>
-                {errors.height ? <Text className="text-red-500 text-sm ml-2">{errors.height}</Text> : null}
-              </View>
-
-            </View>
-          </View>
-        )}
-        {/* States 2 */}
-        {states === 2 && (
-          // <View className={classes.container}>
-          //   <View className="flex flex-col gap-1">
-          //     <Text className={classes.title}>What level are you in ?</Text>
-          //   </View>
-
-          //   <View className="flex flex-col gap-5">
-          //     <Text className={classes.text}>Select your level</Text>
-          //     <View className="flex flex-col gap-10 items-center justify-center pt-10">
-          //       <View className="h-[60px]">
-          //         <TouchableOpacity
-          //           activeOpacity={1}
-          //           className={twMerge(
-          //             classes.boxRounded2,
-          //             form.level === "beginner" && "border-[#FDFDFF]"
-          //           )}
-          //           onPress={() => onChangeForm("level", "beginner")}
-          //         >
-          //           <Text
-          //             className={twMerge(
-          //               classes.text,
-          //               form.level === "beginner" && "text-[#FDFDFF]"
-          //             )}
-          //           >
-          //             Beginner
-          //           </Text>
-          //           <View
-          //             className={twMerge(
-          //               classes.rounded,
-          //               form.level === "beginner" &&
-          //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-          //             )}
-          //           ></View>
-          //         </TouchableOpacity>
-          //       </View>
-          //       <View className="h-[60px]">
-          //         <TouchableOpacity
-          //           activeOpacity={1}
-          //           className={twMerge(
-          //             classes.boxRounded2,
-          //             form.level === "intermediate" && "border-[#FDFDFF]"
-          //           )}
-          //           onPress={() => onChangeForm("level", "intermediate")}
-          //         >
-          //           <Text
-          //             className={twMerge(
-          //               classes.text,
-          //               form.level === "intermediate" && "text-[#FDFDFF]"
-          //             )}
-          //           >
-          //             Intermediate
-          //           </Text>
-          //           <View
-          //             className={twMerge(
-          //               classes.rounded,
-          //               form.level === "intermediate" &&
-          //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-          //             )}
-          //           ></View>
-          //         </TouchableOpacity>
-          //       </View>
-          //       <View className="h-[60px]">
-          //         <TouchableOpacity
-          //           activeOpacity={1}
-          //           className={twMerge(
-          //             classes.boxRounded2,
-          //             form.level === "advance" && "border-[#FDFDFF]"
-          //           )}
-          //           onPress={() => onChangeForm("level", "advance")}
-          //         >
-          //           <Text
-          //             className={twMerge(
-          //               classes.text,
-          //               form.level === "advance" && "text-[#FDFDFF]"
-          //             )}
-          //           >
-          //             Advance
-          //           </Text>
-          //           <View
-          //             className={twMerge(
-          //               classes.rounded,
-          //               form.level === "advance" &&
-          //                 "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-          //             )}
-          //           ></View>
-          //         </TouchableOpacity>
-          //       </View>
-          //     </View>
-          //   </View>
-          // </View>
-          <FitnessTestScreen onHideArrow form={form} />
-        )}
-        {/* States 3 */}
-        {states === 3 && (
-          <View className={classes.container}>
-            <View className="flex flex-col gap-1">
-              <Text className={classes.title}>What Your Fitness Goal ?</Text>
-            </View>
-            <View className="flex items-center justify-center">
-              <FitnessGoal />
-            </View>
-            <View className="flex flex-col gap-5">
-              <Text className={classes.text}>Select your Goal</Text>
-              <View className="flex flex-col gap-10 items-center justify-center pt-10">
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.goal === "lose weight" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("goal", "lose weight")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.goal === "lose weight" && "text-[#FDFDFF]"
-                      )}
-                    >
-                      Lose weight
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.goal === "lose weight" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.goal === "gain muscle" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("goal", "gain muscle")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.goal === "gain muscle" && "text-[#FDFDFF]"
-                      )}
-                    >
-                      Gain Muscle
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.goal === "gain muscle" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.goal === "maintain weight" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("goal", "maintain weight")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.goal === "maintain weight" && "text-[#FDFDFF]"
-                      )}
-                    >
-                      Maintain Weight
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.goal === "maintain weight" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </View>
-        )}
-        {/* States 4 */}
-        {states === 4 && (
-          <View className={classes.container}>
-            <View className="flex flex-col gap-1">
-              <Text className={classes.title}>
-                Where do you prefer to workout ?
-              </Text>
-            </View>
-            <View className="flex items-center justify-center">
-              <Workout />
-            </View>
-            <View className="flex flex-col gap-5">
-              <Text className={classes.text}>Select the place</Text>
-              <View className="flex flex-col gap-10 items-center justify-center pt-10">
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.equipment === "None" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("equipment", "None")}
-                  >
-                    <View className="absolute left-5">
-                      {form.equipment === "None" ? (
-                        <HomePreferIconWhite />
-                      ) : (
-                        <HomePreferIcon />
-                      )}
-                    </View>
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.equipment === "None" && "text-[#FDFDFF]"
-                      )}
-                    >
-                      No Equipment
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.equipment === "None" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                {/* <View className="h-[60px]">
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.equipment === "None" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        No Equipment
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.equipment === "None" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  {/* <View className="h-[60px]">
                   <TouchableOpacity
                     activeOpacity={1}
                     className={twMerge(
@@ -820,388 +831,389 @@ const Question = () => {
                     ></View>
                   </TouchableOpacity>
                 </View> */}
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      form.equipment === "Dumbbell" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("equipment", "Dumbbell")}
-                  >
-                    <View className="absolute left-5 w-[32px] h-[32px] items-center justify-center">
-                      {form.equipment === "Dumbbell" ? (
-                        <DumbbellWhite />
-                      ) : (
-                        <Dumbbell />
-                      )}
-                    </View>
-                    <Text
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
                       className={twMerge(
-                        classes.text,
-                        form.equipment === "Dumbbell" && "text-[#FDFDFF]"
+                        classes.boxRounded2,
+                        form.equipment === "Dumbbell" && "border-[#FDFDFF]"
                       )}
+                      onPress={() => onChangeForm("equipment", "Dumbbell")}
                     >
-                      Dumbbell
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.equipment === "Dumbbell" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
+                      <View className="absolute left-5 w-[32px] h-[32px] items-center justify-center">
+                        {form.equipment === "Dumbbell" ? (
+                          <DumbbellWhite />
+                        ) : (
+                          <Dumbbell />
+                        )}
+                      </View>
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.equipment === "Dumbbell" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Dumbbell
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.equipment === "Dumbbell" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             </View>
-          </View>
-        )}
-        {/* States 5 */}
-        {states === 5 && (
-          <View className={classes.container}>
-            <View className="flex flex-col gap-1">
-              <Text className={classes.title}>
-                What is your typical activity level?
-              </Text>
-            </View>
-            <View className="flex flex-col gap-5">
-              <Text className={classes.text}>Select the activity</Text>
-              <View className="flex flex-col gap-10 items-center justify-center">
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.activity === "sedentary" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("activity", "sedentary")}
-                  >
-                    <Text
+          )}
+          {/* States 5 */}
+          {states === 5 && (
+            <View className={classes.container}>
+              <View className="flex flex-col gap-1">
+                <Text className={classes.title}>
+                  What is your typical activity level?
+                </Text>
+              </View>
+              <View className="flex flex-col gap-5">
+                <Text className={classes.text}>Select the activity</Text>
+                <View className="flex flex-col gap-10 items-center justify-center">
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
                       className={twMerge(
-                        classes.text,
-
-                        form.activity === "sedentary" && "text-[#FDFDFF]"
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.activity === "sedentary" && "border-[#FDFDFF]"
                       )}
+                      onPress={() => onChangeForm("activity", "sedentary")}
                     >
-                      Sedentary (little or no exercise, desk job)
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.activity === "sedentary" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.activity === "lightly active" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("activity", "lightly active")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
+                      <Text
+                        className={twMerge(
+                          classes.text,
 
-                        form.activity === "lightly active" && "text-[#FDFDFF]"
+                          form.activity === "sedentary" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Sedentary (little or no exercise, desk job)
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.activity === "sedentary" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.activity === "lightly active" && "border-[#FDFDFF]"
                       )}
+                      onPress={() => onChangeForm("activity", "lightly active")}
                     >
-                      Lightly active (light exercise or sports 1-2 days/week)
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
+                      <Text
+                        className={twMerge(
+                          classes.text,
 
-                        form.activity === "lightly active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.activity === "moderately active" &&
-                      "border-[#FDFDFF]"
-                    )}
-                    onPress={() =>
-                      onChangeForm("activity", "moderately active")
-                    }
-                  >
-                    <Text
+                          form.activity === "lightly active" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Lightly active (light exercise or sports 1-2 days/week)
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+
+                          form.activity === "lightly active" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
                       className={twMerge(
-                        classes.text,
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
                         form.activity === "moderately active" &&
-                        "text-[#FDFDFF]"
+                        "border-[#FDFDFF]"
                       )}
+                      onPress={() =>
+                        onChangeForm("activity", "moderately active")
+                      }
                     >
-                      Moderately active (moderate exercise or sports 3-5
-                      days/week)
-                    </Text>
-                    <View
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.activity === "moderately active" &&
+                          "text-[#FDFDFF]"
+                        )}
+                      >
+                        Moderately active (moderate exercise or sports 3-5
+                        days/week)
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.activity === "moderately active" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
                       className={twMerge(
-                        classes.rounded,
-                        form.activity === "moderately active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.activity === "very active" && "border-[#FDFDFF]"
                       )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.activity === "very active" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("activity", "very active")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.activity === "very active" && "text-[#FDFDFF]"
-                      )}
+                      onPress={() => onChangeForm("activity", "very active")}
                     >
-                      Very active (hard exercise or sports 6-7 days/week)
-                    </Text>
-                    <View
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.activity === "very active" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Very active (hard exercise or sports 6-7 days/week)
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.activity === "very active" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
                       className={twMerge(
-                        classes.rounded,
-                        form.activity === "very active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.activity === "extra active" && "border-[#FDFDFF]"
                       )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.activity === "extra active" && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("activity", "extra active")}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.activity === "extra active" && "text-[#FDFDFF]"
-                      )}
+                      onPress={() => onChangeForm("activity", "extra active")}
                     >
-                      Extra active (very hard exercise, training twice a day)
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.activity === "extra active" &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.activity === "extra active" && "text-[#FDFDFF]"
+                        )}
+                      >
+                        Extra active (very hard exercise, training twice a day)
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.activity === "extra active" &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </View>
             </View>
+          )}
+          {/* States 6 */}
+          {states === 6 && (
+            <ScrollView className={classes.container}>
+              <View className="flex flex-col gap-1">
+                <Text className={classes.title}>
+                  How many day you want to workout per week?
+                </Text>
+              </View>
+              <View className="flex flex-col gap-5">
+                <Text className={classes.text}>Select the day</Text>
+                <View className="flex flex-col gap-4 items-center justify-center">
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.workoutDay === 1 && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("workoutDay", 1)}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.workoutDay === 1 && "text-[#FDFDFF]"
+                        )}
+                      >
+                        1
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.workoutDay === 1 &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.workoutDay === 2 && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("workoutDay", 2)}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.workoutDay === 2 && "text-[#FDFDFF]"
+                        )}
+                      >
+                        2
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.workoutDay === 2 &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.workoutDay === 3 && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("workoutDay", 3)}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.workoutDay === 3 && "text-[#FDFDFF]"
+                        )}
+                      >
+                        3
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.workoutDay === 3 &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.workoutDay === 4 && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("workoutDay", 4)}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.workoutDay === 4 && "text-[#FDFDFF]"
+                        )}
+                      >
+                        4
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.workoutDay === 4 &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.workoutDay === 5 && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("workoutDay", 5)}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.workoutDay === 5 && "text-[#FDFDFF]"
+                        )}
+                      >
+                        5
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.workoutDay === 5 &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                  <View className="h-[60px]">
+                    <TouchableOpacity
+                      activeOpacity={1}
+                      className={twMerge(
+                        classes.boxRounded2,
+                        "text-wrap pr-10 pl-4 w-[300px]",
+                        form.workoutDay === 6 && "border-[#FDFDFF]"
+                      )}
+                      onPress={() => onChangeForm("workoutDay", 6)}
+                    >
+                      <Text
+                        className={twMerge(
+                          classes.text,
+                          form.workoutDay === 6 && "text-[#FDFDFF]"
+                        )}
+                      >
+                        6
+                      </Text>
+                      <View
+                        className={twMerge(
+                          classes.rounded,
+                          form.workoutDay === 6 &&
+                          "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
+                        )}
+                      ></View>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            </ScrollView>
+          )}
+          <View className="flex flex-1 items-center justify-center align-bottom">
+            <ButtonCustom
+              onClick={handleNextState}
+              text="Continued"
+              textColor="#EEEEF0"
+              bgColor="#142939"
+            />
           </View>
-        )}
-        {/* States 6 */}
-        {states === 6 && (
-          <ScrollView className={classes.container}>
-            <View className="flex flex-col gap-1">
-              <Text className={classes.title}>
-                How many day you want to workout per week?
-              </Text>
-            </View>
-            <View className="flex flex-col gap-5">
-              <Text className={classes.text}>Select the day</Text>
-              <View className="flex flex-col gap-4 items-center justify-center">
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.workoutDay === 1 && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("workoutDay", 1)}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.workoutDay === 1 && "text-[#FDFDFF]"
-                      )}
-                    >
-                      1
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.workoutDay === 1 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.workoutDay === 2 && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("workoutDay", 2)}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.workoutDay === 2 && "text-[#FDFDFF]"
-                      )}
-                    >
-                      2
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.workoutDay === 2 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.workoutDay === 3 && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("workoutDay", 3)}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.workoutDay === 3 && "text-[#FDFDFF]"
-                      )}
-                    >
-                      3
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.workoutDay === 3 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.workoutDay === 4 && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("workoutDay", 4)}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.workoutDay === 4 && "text-[#FDFDFF]"
-                      )}
-                    >
-                      4
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.workoutDay === 4 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.workoutDay === 5 && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("workoutDay", 5)}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.workoutDay === 5 && "text-[#FDFDFF]"
-                      )}
-                    >
-                      5
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.workoutDay === 5 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-                <View className="h-[60px]">
-                  <TouchableOpacity
-                    activeOpacity={1}
-                    className={twMerge(
-                      classes.boxRounded2,
-                      "text-wrap pr-10 pl-4 w-[300px]",
-                      form.workoutDay === 6 && "border-[#FDFDFF]"
-                    )}
-                    onPress={() => onChangeForm("workoutDay", 6)}
-                  >
-                    <Text
-                      className={twMerge(
-                        classes.text,
-                        form.workoutDay === 6 && "text-[#FDFDFF]"
-                      )}
-                    >
-                      6
-                    </Text>
-                    <View
-                      className={twMerge(
-                        classes.rounded,
-                        form.workoutDay === 6 &&
-                        "bg-[#FDFDFF] border-[0px] border-[#FDFDFF"
-                      )}
-                    ></View>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </View>
-          </ScrollView>
-        )}
-        <View className="flex flex-1 items-center justify-center align-bottom">
-          <ButtonCustom
-            onClick={handleNextState}
-            text="Continued"
-            textColor="#EEEEF0"
-            bgColor="#142939"
-          />
         </View>
-      </View>
-    </TouchableWithoutFeedback>
+      </TouchableWithoutFeedback>
+    </KeyboardAvoidingView>
   );
 };
 export default Question;
