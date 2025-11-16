@@ -29,8 +29,8 @@ export function calculateTDEEAndMacros(user: UserInput): MacroResult {
   // Calculate BMR
   let BMR =
     gender === 'male'
-      ? (13.7 * weight) + (5 * height) - (6.8 * age) + 66
-      : (9.6 * weight) + (8 * height) - (4.7 * age) + 655;
+      ? (10 * weight) + (6.25 * height) - (5 * age) + 5
+      : (10 * weight) + (6.25 * height) - (5 * age) - 161;
 
   // Apply activity multiplier
   const activityMultipliers: Record<ActivityLevel, number> = {
@@ -45,7 +45,7 @@ export function calculateTDEEAndMacros(user: UserInput): MacroResult {
 
   // Adjust TDEE based on goal
   let adjustedTdee = TDEE;
-  if (goal === 'lose weight') adjustedTdee -= 500;
+  if (goal === 'lose weight') adjustedTdee -= 300;
   else if (goal === 'gain muscle') adjustedTdee += 300;
 
   // Macronutrient distribution

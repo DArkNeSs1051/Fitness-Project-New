@@ -175,14 +175,15 @@ const EditNutritionPlanBottomSheet = forwardRef<EditNutritionPlanBottomSheetRef,
             <Text className="text-xl font-bold mb-3">Edit Nutrition Plan</Text>
 
             <Text className="mb-1">Age</Text>
-            <TextInput
+            <Text className="mb-1">{age}</Text>
+            {/* <TextInput
               keyboardType="numeric"
               value={age}
               onChangeText={setAge}
               className="border px-3 py-2 rounded mb-3"
               placeholder="Enter your age"
               placeholderTextColor="#aaa"
-            />
+            /> */}
 
             <Text className="mb-1">Gender</Text>
             <View className="flex-row space-x-3 mb-3">

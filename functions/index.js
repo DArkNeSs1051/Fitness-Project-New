@@ -61,7 +61,7 @@ Exercises (use ONLY from this list by exact "name"):
 ${JSON.stringify(allowedLite)}
 
 Rules:
-1) Exactly ${userData.workoutDay} sessions/week (~${userData.workoutDay * 4}-${userData.workoutDay * 5} total). Other days are "Rest Day" with empty exercises.
+1) Exactly ${userData.workoutDay} days/week (~${userData.workoutDay * 4}-${userData.workoutDay * 5} total). Other days are "Rest Day" with empty exercises.
 2) Distribute sessions evenly; avoid back-to-back unless training 6–7 days/week.
 3) Each workout day has 3–${MAX_EX_PER_DAY} exercises targeting related muscle groups.
 4) Respect equipment limits: None=bodyweight only; Dumbbell=bodyweight or dumbbell; else=full gym allowed.
@@ -70,6 +70,15 @@ Rules:
   - For static/time exercises like Plank, Side Plank, Wall Sit → reps must be mm:ss, e.g. "00:30"
   - Single limb exercises: the total number (e.g., "30" for 15/side)
   - Rest must always be mm:ss, e.g. "01:00"
+6) Intensity must reflect user's level:
+   - Beginner: moderate reps, longer rest (01:00–01:30)
+   - Intermediate: moderate–high reps, moderate rest (00:45–01:00)
+   - Advanced: higher reps or volume, shorter rest (00:30–00:45)
+7) Across the plan, progression should be present:
+   - either increasing reps/sets slightly each week OR
+   - reducing rest time slightly over time
+   - but never change both at the same time
+
 
 Dates: "${startDate}" .. "${endDate}"
 
@@ -127,7 +136,6 @@ exports.generateWorkoutPlan = onCall(
       const filtered = eq === "None" ? exercises.filter((ex) => norm(ex.equipment) === "None") : exercises;
       const allowedLite = toAllowedLite(filtered, MAX_EX_LIBRARY);
 
-      // Dates in Bangkok time (fallback to local if tz fails, just in case)
       let today;
       try {
         today = dayjs().tz("Asia/Bangkok");
@@ -136,7 +144,7 @@ exports.generateWorkoutPlan = onCall(
         today = dayjs();
       }
       const startDate = today.format("YYYY-MM-DD");
-      const endDate = today.add(29, "day").format("YYYY-MM-DD");
+      const endDate = today.add(15, "day").format("YYYY-MM-DD");
 
       const t1 = Date.now();
 
@@ -167,7 +175,7 @@ exports.generateWorkoutPlan = onCall(
 
       const t2 = Date.now();
 
-      // Delete present→future
+      // Delete present and future
       const userRef = db.collection("users").doc(userId);
       const routinesRef = userRef.collection("routines");
       const futureSnap = await routinesRef
@@ -186,7 +194,7 @@ exports.generateWorkoutPlan = onCall(
         if (opsDel) await batchDel.commit();
       }
 
-      // Write new plan (cap per-day exercises)
+      // Write new plan 
       let batch = db.batch();
       let ops = 0;
 
@@ -232,8 +240,7 @@ exports.generateWorkoutPlan = onCall(
         endDate,
       };
     } catch (err) {
-      // Log with stack + code for easier debugging
-      logger.error("❌ Error generating workout plan", {
+      logger.error("Error generating workout plan", {
         message: String(err?.message || err),
         stack: err?.stack,
         code: err?.code,

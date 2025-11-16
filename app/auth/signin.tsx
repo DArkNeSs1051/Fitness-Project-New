@@ -1,122 +1,35 @@
-import { useAuth, useOAuth, useSignIn, useUser } from "@clerk/clerk-expo";
-import dayjs from "dayjs";
-import * as Linking from "expo-linking";
-import { useRouter } from "expo-router";
-import {
-  getAuth,
-  onAuthStateChanged,
-  signInWithCustomToken,
-} from "firebase/auth";
-import { doc, getDoc, setDoc } from "firebase/firestore";
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { ActivityIndicator, Image, Text, View } from "react-native";
+import { useRouter } from "expo-router";
 import { twMerge } from "tailwind-merge";
+import { useSignIn, useAuth, useOAuth } from "@clerk/clerk-expo";
+import { makeRedirectUri } from "expo-auth-session";
 import ButtonCustom from "~/components/BBComponents/ButtonCustom";
 import TextInputCustom from "~/components/BBComponents/TextInputCustom";
 import GmailiconColor from "../../assets/images/Image/GmailiconColor.svg";
-import { FIRESTORE_DB } from "../../firebase";
-import { useRoutineStore } from "~/store/useRoutineStore";
-import { useUserStore } from "~/store/useUserStore";
 
 const SignIn: React.FC = () => {
-  const { signIn, setActive, isLoaded: signInLoaded } = useSignIn();
-  const { userId, isLoaded: authLoaded, isSignedIn, getToken } = useAuth();
-  const { user } = useUser();
   const router = useRouter();
 
+  const { isLoaded: signInLoaded, signIn, setActive } = useSignIn();
+  const { isLoaded: authLoaded } = useAuth();
+  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+
   const [form, setForm] = useState({ emailAddress: "", password: "" });
-  const [isFirebaseAuthenticating, setIsFirebaseAuthenticating] = useState(false);
-
-  const onChangeForm = (key: string, value: string) => {
+  const onChangeForm = (key: string, value: string) =>
     setForm((p) => ({ ...p, [key]: value }));
-  };
 
-  const clickToSignUp = () => router.push("/auth/signup");
-  const clickToForgotPassword = () => router.push("/auth/forgotPassword");
-
-  const signIntoFirebaseWithClerk = async () => {
-    const token = await getToken({ template: "integration_firebase" });
-    if (!token) throw new Error("No Clerk token");
-
-    const auth = getAuth();
-    await signInWithCustomToken(auth, token);
-
-    await new Promise((resolve, reject) => {
-      const timeout = setTimeout(() => reject("Firebase auth timeout"), 5000);
-      const unsubscribe = onAuthStateChanged(auth, (usr) => {
-        if (usr) {
-          clearTimeout(timeout);
-          unsubscribe();
-          console.log("✅ Firebase auth state confirmed:", usr.uid);
-          resolve(true);
-        }
-      });
-    });
-
-    const firebaseIdToken = await getAuth().currentUser?.getIdToken();
-    console.log("✅ Firebase ID Token:", firebaseIdToken);
-  };
-
-  useEffect(() => {
-    const checkOrCreateUser = async () => {
-      if (!(authLoaded && isSignedIn && userId)) return;
-
-      setIsFirebaseAuthenticating(true);
-      try {
-        console.log("🔄 Starting Firebase authentication process...");
-        await signIntoFirebaseWithClerk();
-
-        console.log("✅ Firebase auth done. Checking Firestore user doc...");
-        const userRef = doc(FIRESTORE_DB, "users", userId);
-        const userDocSnap = await getDoc(userRef);
-
-        if (!userDocSnap.exists()) {
-          await setDoc(userRef, {
-            email: user?.primaryEmailAddress?.emailAddress || "",
-            firstName: user?.firstName || "",
-            lastName: user?.lastName || "",
-            createdAt: dayjs().toISOString(),
-            isFirstLogin: true,
-          });
-          console.log("✅ Created new user document in Firestore");
-        } else {
-          console.log("✅ Found user in Firestore:", userDocSnap.data());
-        }
-
-        const { reset: resetRoutine, fetchRoutineFromFirestore } = useRoutineStore.getState();
-        const { reset: resetUser, loadUserDataFromFirestore } = useUserStore.getState();
-
-        resetRoutine();
-        resetUser();
-
-        await Promise.all([
-          fetchRoutineFromFirestore(userId),
-          loadUserDataFromFirestore(userId),
-        ]);
-
-        console.log("✅ User setup completed, navigating to /workout...");
-        setIsFirebaseAuthenticating(false);
-        router.replace("/workout");
-      } catch (error) {
-        console.error("❌ Error in checkOrCreateUser:", error);
-        setIsFirebaseAuthenticating(false);
-        alert("Authentication error. Please try again.");
-      }
-    };
-
-    checkOrCreateUser();
-  }, [authLoaded, isSignedIn, userId]);
-
-  // Clerk email/password sign in
+  // Email / Password
   const onSignInPress = async () => {
     if (!signInLoaded) return;
     try {
       const attempt = await signIn.create({
-        identifier: form.emailAddress,
+        identifier: form.emailAddress.trim(),
         password: form.password,
       });
-      if (attempt.status === "complete") {
+      if (attempt.status === "complete" && attempt.createdSessionId) {
         await setActive({ session: attempt.createdSessionId });
+        router.replace("/oauth-native-callback");
       } else {
         alert("Sign in failed");
       }
@@ -125,27 +38,31 @@ const SignIn: React.FC = () => {
     }
   };
 
-  const { startOAuthFlow } = useOAuth({ strategy: "oauth_google" });
+  // Google OAuth
   const onSignInGoogle = async () => {
     if (!authLoaded) return;
     try {
-      const redirectUrl = Linking.createURL("/");
-      const complete = await startOAuthFlow({ redirectUrl });
-      if (complete.authSessionResult?.type === "success" && complete.setActive) {
-        await complete.setActive({ session: complete.createdSessionId });
+      const redirectUrl = makeRedirectUri({
+        scheme: "fit-health",          // ต้องตรงกับ app.config.js
+        path: "oauth-native-callback", // ต้องตรงกับ Clerk allowlist
+      });
+
+      const { createdSessionId, setActive, authSessionResult } =
+        await startOAuthFlow({ redirectUrl });
+
+      if (authSessionResult?.type === "success" && createdSessionId && setActive) {
+        await setActive({ session: createdSessionId });
+        router.replace("/oauth-native-callback");
       }
     } catch (err: any) {
       alert(err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ");
     }
   };
 
-  if (!signInLoaded || !authLoaded || isFirebaseAuthenticating) {
+  if (!signInLoaded || !authLoaded) {
     return (
       <View className="flex-1 items-center justify-center bg-[#84BDEA]">
         <ActivityIndicator size="large" color="#5FA3D6" />
-        {isFirebaseAuthenticating && (
-          <Text className="mt-4 text-center-[#142939] font-semibold">Setting up your account...</Text>
-        )}
       </View>
     );
   }
@@ -168,16 +85,17 @@ const SignIn: React.FC = () => {
           title="Email"
           placeholder="Enter your email"
           value={form.emailAddress}
-          onChangeText={(text) => onChangeForm("emailAddress", text)}
+          onChangeText={(t) => onChangeForm("emailAddress", t)}
           keyboardType="email-address"
           autoComplete="email"
           textContentType="emailAddress"
+          autoCapitalize="none"
         />
         <TextInputCustom
           title="Password"
           placeholder="Enter your password"
           value={form.password}
-          onChangeText={(text) => onChangeForm("password", text)}
+          onChangeText={(t) => onChangeForm("password", t)}
           secureTextEntry
           autoComplete="password"
           textContentType="password"
@@ -207,12 +125,12 @@ const SignIn: React.FC = () => {
       <View className="flex flex-col gap-2 w-[250px]">
         <Text className="text-[#000000] text-[12px]">
           Don't you have an account?{" "}
-          <Text onPress={clickToSignUp} className="text-[#42779F] font-bold">
+          <Text onPress={() => router.push("/auth/signup")} className="text-[#42779F] font-bold">
             Sign Up
           </Text>
         </Text>
         <Text
-          onPress={clickToForgotPassword}
+          onPress={() => router.push("/auth/forgotPassword")}
           className="text-[#42779F] text-[12px] font-bold"
         >
           Forgot your password?

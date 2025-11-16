@@ -162,6 +162,11 @@ const WorkoutSession = (props: IWorkoutSessionScreen) => {
         originWhitelist={["*"]}
         allowFileAccess={true}
         allowUniversalAccessFromFileURLs={true}
+        mediaCapturePermissionGrantType="grant"
+        onShouldStartLoadWithRequest={(req) => {
+          const clean = (s:string) => s.replace(/\/+$/, '');
+          return clean(req.url).startsWith(clean("https://newcamera-pi.vercel.app/"));
+        }}
         // onMessage={(event) => {
         //   try {
         //     const data = JSON.parse(event.nativeEvent.data);

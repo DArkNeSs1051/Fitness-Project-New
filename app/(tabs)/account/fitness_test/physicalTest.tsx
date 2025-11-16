@@ -134,6 +134,11 @@ export default function MFTTestScreen() {
       originWhitelist={["*"]}
       allowFileAccess
       allowUniversalAccessFromFileURLs
+      mediaCapturePermissionGrantType="grant"
+      onShouldStartLoadWithRequest={(req) => {
+        const clean = (s:string) => s.replace(/\/+$/, '');
+        return clean(req.url).startsWith(clean("https://newcamera-pi.vercel.app/"));
+      }}
       onMessage={onMessage}
     />
   );
