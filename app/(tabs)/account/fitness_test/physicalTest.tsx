@@ -12,6 +12,7 @@ export default function MFTTestScreen() {
   const formGender = useFitnessFormStore((s) => s.form?.gender);
   const setForm = useFitnessFormStore((s) => s.setForm);
   const profileGender = useUserStore((s) => s.user?.gender);
+  const profileAge = useUserStore((s) => s.user?.age);
 
   const { user } = useUser();
   const navigation = useNavigation();
@@ -22,8 +23,7 @@ export default function MFTTestScreen() {
     let intervalId: ReturnType<typeof setInterval> | null = null;
 
     const run = async () => {
-      let effectiveGender: string | undefined =
-        profileGender ?? formGender;
+      let effectiveGender: string | undefined = profileGender ?? formGender;
 
       try {
         if (user?.id) {
@@ -37,6 +37,13 @@ export default function MFTTestScreen() {
                 setForm(() => ({ gender: dbGender }));
               }
             }
+
+            const dbAge = snap.data()?.age as string | undefined;
+            if (dbAge !== undefined) {
+              if (dbAge !== useFitnessFormStore.getState().form?.age) {
+                setForm((prev: any) => ({ ...prev, age: dbAge }));
+              }
+            }
           }
         }
       } catch (e) {
@@ -47,6 +54,7 @@ export default function MFTTestScreen() {
         const payload = {
           type: "FROM_TEST",
           gender: effectiveGender ?? formGender ?? "unknown",
+          age: profileAge ?? useFitnessFormStore.getState().form?.age ?? null,
         };
         const jsCode = `
           window.dispatchEvent(
