@@ -30,6 +30,7 @@ export default function GeneratePlanScreen() {
   const [progress, setProgress] = useState(0);
 
   const [age, setAge] = useState("");
+  const [workoutDay, setworkoutDay] = useState("");
   const [gender, setGender] = useState("");
   const [weight, setWeight] = useState("");
   const [height, setHeight] = useState("");
@@ -38,6 +39,7 @@ export default function GeneratePlanScreen() {
 
   const [openGoal, setOpenGoal] = useState(false);
   const [openEquipment, setOpenEquipment] = useState(false);
+  const [openWorkoutDay, setOpenWorkoutDay] = useState(false);
   const [items, setItems] = useState([
     { label: "Lose weight", value: "lose weight" },
     { label: "Gain Muscle", value: "gain muscle" },
@@ -47,6 +49,14 @@ export default function GeneratePlanScreen() {
     { label: "None", value: "None" },
     { label: "Dumbbell", value: "Dumbbell" },
   ]);
+  const [itemDay,setItemDay] = useState([
+    { label: "1", value: '1' },
+    { label: "2", value: '2' },
+    { label: "3", value: '3' },
+    { label: "4", value: '4' },
+    { label: "5", value: '5' },
+    { label: "6", value: '6' },
+  ])
 
   const getProgressText = () => {
     if (progress < 30) return "Saving your information...";
@@ -66,6 +76,7 @@ export default function GeneratePlanScreen() {
         if (docSnap.exists()) {
           const data = docSnap.data();
           setAge(data.age?.toString() || "");
+          setworkoutDay(data.workoutDay?.toString() || "");
           setGender(data.gender || "");
           setWeight(data.weight?.toString() || "");
           setHeight(data.height?.toString() || "");
@@ -89,7 +100,7 @@ export default function GeneratePlanScreen() {
   };
 
   const handleGenerate = async () => {
-    if (!age || !gender || !weight || !height || !goal || !equipment) {
+    if (!age || !workoutDay || !gender || !weight || !height || !goal || !equipment) {
       Alert.alert("Missing Information", "Please fill in all fields.");
       return;
     }
@@ -107,7 +118,7 @@ export default function GeneratePlanScreen() {
       setProgress(30);
 
       const userRef = doc(FIRESTORE_DB, "users", user.id);
-      await updateDoc(userRef, { age, gender, weight, height, goal, equipment });
+      await updateDoc(userRef, { age, workoutDay: Number(workoutDay), gender, weight, height, goal, equipment });
 
       setProgress(60);
       await new Promise((r) => setTimeout(r, 300));
@@ -144,15 +155,29 @@ export default function GeneratePlanScreen() {
 
         <View style={styles.content}>
           <Text style={styles.title}>Generate Workout Plan</Text>
-
-          <Text style={styles.label}>Age</Text>
-          <TextInput
-            style={styles.input}
-            keyboardType="numeric"
-            value={age}
-            onChangeText={setAge}
-          />
-
+          <View className="flex-row">
+            <View className="mr-20">
+              <Text style={styles.label}>Age</Text>
+              <Text className="mt-5">{age}</Text>
+            </View>
+            <View className="flex-column">
+              <Text style={styles.label}>Workout Days</Text>
+              <View style={{zIndex: openWorkoutDay ? 2000 : 1000}}>
+                <DropDownPicker
+                  open={openWorkoutDay}
+                  value={workoutDay}
+                  items={itemDay}
+                  setOpen={setOpenWorkoutDay}
+                  setValue={setworkoutDay}
+                  setItems={setItemDay}
+                  style={styles.dropdownDay}
+                  dropDownContainerStyle={styles.dropdownContainerDay}
+                  placeholder="How many day you want to workout"
+                  disabled={submitting}
+                />
+              </View>
+            </View>
+          </View>
           <Text style={styles.label}>Gender</Text>
           <View style={{ flexDirection: "row", gap: 10, marginTop: 5 }}>
             {["Male", "Female"].map((g) => (
@@ -200,7 +225,7 @@ export default function GeneratePlanScreen() {
               items={itemsEquipment}
               setOpen={setOpenEquipment}
               setValue={setEquipment}
-              setItems={setItems}
+              setItems={setItemsEquipment}
               style={styles.dropdown}
               dropDownContainerStyle={styles.dropdownContainer}
               placeholder="Select your equipment"
@@ -260,7 +285,8 @@ const styles = StyleSheet.create({
     backgroundColor: "#84BDEA",
   },
   content: {
-    padding: 40
+    paddingVertical:20,
+    paddingHorizontal: 40
   },
   title: {
     fontSize: 26,
@@ -290,6 +316,18 @@ const styles = StyleSheet.create({
     borderColor: "#ccc",
     marginTop: 5,
     
+  },
+  dropdownDay: {
+    backgroundColor: "#fff",
+    borderColor: "#ccc",
+    marginTop: 5,
+    width:210
+    
+  },
+  dropdownContainerDay: {
+    backgroundColor: "#fff",
+    borderColor: "#ccc",
+    width:210
   },
   dropdownContainer: {
     backgroundColor: "#fff",

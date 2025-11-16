@@ -1,4 +1,3 @@
-// store/useRoutineStore.ts
 import { create } from "zustand";
 import { collection, doc, getDocs, setDoc } from "firebase/firestore";
 import { FIRESTORE_DB } from "../firebase";
@@ -48,7 +47,6 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     try {
       const { ownerId } = get();
 
-      // If the user changed, wipe previous user's data first
       if (ownerId && ownerId !== userId) {
         set({ workouts: {}, selectedDate: dayjs().format("YYYY-MM-DD") });
       }
@@ -108,7 +106,6 @@ export const useRoutineStore = create<RoutineStore>((set, get) => ({
     const prevDay: Day =
       workouts[selectedDate] ?? { exercises: [], completed: false, title: "" };
 
-    // If this day was a Rest Day, rename it. 
     const wasRestDay =
       typeof prevDay.title === "string" && /rest\s*day/i.test(prevDay.title);
 

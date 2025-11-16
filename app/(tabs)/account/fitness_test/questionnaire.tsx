@@ -4,53 +4,63 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useUser } from "@clerk/clerk-expo";
 import { doc, updateDoc } from "firebase/firestore";
-import { FIRESTORE_DB } from "../../../../firebase"; // adjust to your path
+import { FIRESTORE_DB } from "../../../../firebase";
 import { useFitnessFormStore } from "~/store/useFitnessFormStore";
 
 const questions = [
   {
-    key: "frequency",
-    question: "How often do you exercise per week?",
+    key: "general physical fitness",
+    question: "Your general physical fitness is",
     options: [
-      { label: "0–1 days", value: 1 },
-      { label: "2–3 days", value: 2 },
-      { label: "4+ days", value: 3 },
+      { label: "Very Poor", value: 1 },
+      { label: "Poor", value: 2 },
+      { label: "Average", value: 3 },
+      { label: "Good", value: 4 },
+      { label: "Excellent", value: 5 },
     ],
   },
   {
-    key: "type",
-    question: "What type of exercises do you usually do?",
+    key: "cardio",
+    question: "Your cardiorespiratory fitness (capacity to do exercise, for instance running, for a long time) is",
     options: [
-      { label: "Light (walking, stretching)", value: 1 },
-      { label: "Moderate (bodyweight, yoga)", value: 2 },
-      { label: "Intense (HIIT, strength, sports)", value: 3 },
+      { label: "Very Poor", value: 1 },
+      { label: "Poor", value: 2 },
+      { label: "Average", value: 3 },
+      { label: "Good", value: 4 },
+      { label: "Excellent", value: 5 },
     ],
   },
   {
-    key: "duration",
-    question: "How long is your typical workout session?",
+    key: "muscular strength",
+    question: "Your muscular strength is",
     options: [
-      { label: "Less than 20 minutes", value: 1 },
-      { label: "20–40 minutes", value: 2 },
-      { label: "More than 40 minutes", value: 3 },
+      { label: "Very Poor", value: 1 },
+      { label: "Poor", value: 2 },
+      { label: "Average", value: 3 },
+      { label: "Good", value: 4 },
+      { label: "Excellent", value: 5 },
     ],
   },
   {
-    key: "pushups",
-    question: "Can you do 10+ push-ups with proper form?",
+    key: "agility",
+    question: "Your speed / agility is",
     options: [
-      { label: "No", value: 1 },
-      { label: "Yes, but it’s difficult", value: 2 },
-      { label: "Yes, easily", value: 3 },
+      { label: "Very Poor", value: 1 },
+      { label: "Poor", value: 2 },
+      { label: "Average", value: 3 },
+      { label: "Good", value: 4 },
+      { label: "Excellent", value: 5 },
     ],
   },
   {
-    key: "selfRating",
-    question: "How do you rate your overall fitness?",
+    key: "flexibility",
+    question: "Your flexibility is",
     options: [
-      { label: "Beginner", value: 1 },
-      { label: "Average/Moderate", value: 2 },
-      { label: "Fit/Strong", value: 3 },
+      { label: "Very Poor", value: 1 },
+      { label: "Poor", value: 2 },
+      { label: "Average", value: 3 },
+      { label: "Good", value: 4 },
+      { label: "Excellent", value: 5 },
     ],
   },
 ];
@@ -67,31 +77,51 @@ export default function FitnessLevelForm() {
   };
 
   const calculateResult = async () => {
-    const total = Object.values(answers).reduce((sum, val) => sum + val, 0);
-    let level = "beginner";
-    if (total >= 12) level = "advanced";
-    else if (total >= 8) level = "intermediate";
+  if (Object.keys(answers).length !== questions.length) {
+    Alert.alert("Incomplete", "Please answer all questions before submit.");
+    return;
+  }
 
-    setResult(`Your estimated fitness level is: ${level}`);
+  const sum = Object.values(answers).reduce((acc, val) => acc + val, 0);
+  const avg = sum / questions.length; 
 
-    try {
-      if (user?.id) {
-        const userRef = doc(FIRESTORE_DB, "users", user.id);
-        await updateDoc(userRef, { level });
-        setForm((prev: any) => ({
-          ...prev,
-          level: level,
-          index: 3,
-        }));
-        setTimeout(() => {
-          router.back();
-        }, 1000);
-      }
-    } catch (error) {
-      console.error("Error updating level:", error);
-      Alert.alert("Error", "Failed to save your fitness level.");
+  let level: "Very Poor" | "Poor" | "Average" | "Good" | "Excellent" = "Very Poor";
+
+  if (avg == 5.0) {
+    level = "Excellent";
+  } else if (avg >= 4.0 && avg < 5.0) {
+    level = "Good";
+  } else if (avg >= 3.0 && avg < 4.0) {
+    level = "Average";
+  } else if (avg >= 2.0 && avg < 3.0) {
+    level = "Poor";
+  } else {
+    level = "Very Poor";
+  }
+
+  setResult(`Your estimated fitness level is: ${level}`);
+
+  try {
+    if (user?.id) {
+      const userRef = doc(FIRESTORE_DB, "users", user.id);
+      await updateDoc(userRef, { level });
+
+      setForm((prev: any) => ({
+        ...prev,
+        level,
+        index: 3,
+      }));
+
+      setTimeout(() => {
+        router.back();
+      }, 1000);
     }
-  };
+  } catch (error) {
+    console.error("Error updating level:", error);
+    Alert.alert("Error", "Failed to save your fitness level.");
+  }
+};
+
 
   return (
     <View style={{ flex: 1, paddingTop: 20, backgroundColor: "#84BDEA" }}>

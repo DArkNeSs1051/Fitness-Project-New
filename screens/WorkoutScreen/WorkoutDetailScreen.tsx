@@ -1,4 +1,3 @@
-// WorkoutDetailScreen.tsx
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import React, { useEffect, useMemo, useState } from "react";
@@ -35,10 +34,19 @@ interface Props {
 const WorkoutDetailScreen: React.FC<Props> = ({ workoutId, workoutData }) => {
   const router = useRouter();
   const { user } = useUser();
-
   const [data, setData] = useState<IRoutines | null>(workoutData ?? null);
   const [loading, setLoading] = useState<boolean>(!workoutData);
   const [thumbUrl, setThumbUrl] = useState<string>("");
+  
+  const titleCase = (s: string) => (s ? s[0].toUpperCase() + s.slice(1).toLowerCase() : s);
+  const isRestDay = (title?: string) =>
+    String(title || "").toLowerCase().includes("rest day");
+
+  const inferEquipmentFromExercises = (exs: TExercise[]) =>
+    exs.some((e) => String(e.exercise || "").toLowerCase().includes("dumbbell"))
+      ? "Dumbbell"
+      : "None";
+
 
   // Load workout if not passed via params
   useEffect(() => {
@@ -93,6 +101,23 @@ const WorkoutDetailScreen: React.FC<Props> = ({ workoutId, workoutData }) => {
     });
   };
 
+  const { equipmentLabel, difficultyLabel, rest } = useMemo(() => {
+  if (!data) return { equipmentLabel: "", difficultyLabel: "", rest: false };
+
+  const rest = isRestDay(data.title);
+  if (rest) return { equipmentLabel: "", difficultyLabel: "", rest };
+
+  const equipment = (data as any).equipment || inferEquipmentFromExercises(data.exercises);
+  const difficulty = (data as any).difficulty || "Beginner"; 
+
+  return {
+    equipmentLabel: equipment,
+    difficultyLabel: titleCase(difficulty),
+    rest,
+  };
+}, [data]);
+
+
   if (loading || !data) {
     return (
       <View className="flex-1 bg-[#84BDEA] px-2 pt-5 items-center justify-center">
@@ -141,12 +166,12 @@ const WorkoutDetailScreen: React.FC<Props> = ({ workoutId, workoutData }) => {
       <ScrollView className="p-5 bg-[#1E293B] rounded-t-xl flex-1 mt-4">
         <Text className="text-white text-lg font-semibold mb-2">Equipment</Text>
         <View className="bg-[#2D3B50] p-3 rounded-md mb-4">
-          <Text className="text-white">None</Text>
+          <Text className="text-white">{rest ? "" : equipmentLabel}</Text>
         </View>
 
         <Text className="text-white text-lg font-semibold mb-2">Difficulty</Text>
         <View className="bg-[#2D3B50] p-3 rounded-md mb-4">
-          <Text className="text-white">Beginner</Text>
+          <Text className="text-white">{rest ? "" : difficultyLabel}</Text>
         </View>
 
         <Text className="text-white text-lg font-semibold mb-2">Exercise Detail</Text>

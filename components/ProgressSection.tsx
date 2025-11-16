@@ -1,109 +1,141 @@
-import React from 'react';
-import { View, Text, Dimensions, StyleSheet } from 'react-native';
+import React, { useCallback, useEffect, useMemo } from 'react';
+import { View, Text, Dimensions, StyleSheet, ActivityIndicator, Alert } from 'react-native';
 import { ContributionGraph } from 'react-native-chart-kit';
 import dayjs from 'dayjs';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
 import { shadows } from '~/utils/shadow';
 import { useRoutineStore } from '~/store/useRoutineStore';
 import { useUserStore } from '~/store/useUserStore';
-import { Ionicons } from "@expo/vector-icons";
 
 
 const screenWidth = Dimensions.get('window').width;
 
-export const ProgressSection = () => {
-  
-  const allWorkouts = useRoutineStore((state) => state.workouts);
-  const completedDates = useRoutineStore((state) => state.getCompletedDates());
+export const ProgressSection: React.FC = () => {
+  const workouts = useRoutineStore((s) => s.workouts);
+  const loading = useRoutineStore((s) => s.loading);
+  const getCompletedDates = useRoutineStore((s) => s.getCompletedDates);
+  const fetchRoutineFromFirestore = useRoutineStore((s) => s.fetchRoutineFromFirestore);
+  const userId = useUserStore((s) => s.user?.id) || null;
+  const fitnessLevel = useUserStore((s) => s.user?.level) || 'Intermediate';
+  const equipment = useUserStore((s) => s.user?.equipment) || 'Dumbbells';
+  const goal = useUserStore((s) => s.user?.goal) || 'Weight Loss';
+
+  useEffect(() => {
+    if (userId) {
+      fetchRoutineFromFirestore(userId);
+    }
+  }, [userId, fetchRoutineFromFirestore]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (userId) {
+        fetchRoutineFromFirestore(userId);
+      }
+    }, [userId, fetchRoutineFromFirestore])
+  );
+
+  const allDates = useMemo(() => Object.keys(workouts ?? {}), [workouts]);
+
+  const endDate = useMemo(() => {
+    if (!allDates.length) return dayjs().toDate();
+    const max = allDates.reduce((a, b) => (a > b ? a : b));
+    return dayjs(max).toDate();
+  }, [allDates]);
+
+  const completedDates = useMemo(() => getCompletedDates(), [getCompletedDates, workouts]);
   const completedCount = completedDates.length;
 
-  const fitnessLevel = useUserStore((state) => state.user?.level) || 'Intermediate';
-  const equipment = useUserStore((state) => state.user?.equipment) || 'Dumbbells';
-  const goal = useUserStore((state) => state.user?.goal) || 'Weight Loss';
+  const monthValues = useMemo(
+    () => completedDates.map((d) => ({ date: d, count: 1 })),
+    [completedDates]
+  );
 
-  const allDates = Object.keys(allWorkouts);
-  const maxDate = allDates.length
-    ? dayjs(allDates.reduce((a, b) => (a > b ? a : b)))
-    : dayjs();
+  const handleDayPress = useCallback((day: { date: string; count?: number }) => {
+    if (day?.count === 1) {
+      Alert.alert('Workout', `✅ Workout completed on ${day.date}`);
+    } else {
+      Alert.alert('Workout', `❌ No workout on ${day.date}`);
+    }
+  }, []);
 
-  const endDate = maxDate.toDate();
-
-  const monthValues = completedDates.map(date => ({
-    date,
-    count: 1,
-  }));
-
-  const handleToolTip: any = {}
+  const isReady = !loading;
 
   return (
     <View style={[styles.container, shadows.large]}>
-      <Text style={styles.title}>Your Progress</Text>
-      <Text style={styles.subtitle}>Monthly Workout Consistency</Text>
+      <Text style={styles.title}>Monthly Workout Consistency</Text>
 
-      <View style={styles.graphWrapper}>
-        <ContributionGraph
-          values={monthValues}
-          endDate={endDate}
-          numDays={30}
-          width={screenWidth - 35}
-          height={280}
-          squareSize={20}
-          gutterSize={5}
-          tooltipDataAttrs={(value) => handleToolTip}
-          chartConfig={{
-            backgroundColor: '#42779F',
-            backgroundGradientFrom: '#42779F',
-            backgroundGradientTo: '#42779F',
-            color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
-            labelColor: () => '#e8eef3',
-          }}
-          showMonthLabels={true}
-          showOutOfRangeDays={true}
-          horizontal={true}
-          onDayPress={(day) => {
-            if (day.count === 1) {
-              alert(`✅ Workout completed on ${day.date}`);
-            } else {
-              alert(`❌ No workout on ${day.date}`);
-            }
-          }}
-        />
-
-        <View style={styles.overlayText}>
-          <Text style={styles.completedText}>{completedCount}</Text>
-          <Text style={styles.completedText}>Streak</Text>
+      {!isReady ? (
+        <View style={[styles.graphWrapper, { minHeight: 280, justifyContent: 'center' }]}>
+          <ActivityIndicator size="large" color="#FFFFFF" />
+          <Text style={{ color: '#e8eef3', marginTop: 8 }}>Loading...</Text>
         </View>
+      ) : (
+        <View style={styles.graphWrapper}>
+          <ContributionGraph
+            values={monthValues}
+            endDate={endDate}
+            numDays={30}
+            width={screenWidth - 35}
+            height={280}
+            squareSize={20}
+            gutterSize={5}
+            tooltipDataAttrs={() => ({})}
+            chartConfig={{
+              backgroundColor: '#42779F',
+              backgroundGradientFrom: '#42779F',
+              backgroundGradientTo: '#42779F',
+              color: (opacity = 1) => `rgba(255, 255, 255, ${opacity})`,
+              labelColor: () => '#e8eef3',
+            }}
+            showMonthLabels
+            showOutOfRangeDays
+            horizontal
+            onDayPress={handleDayPress}
+          />
 
-        <View style={styles.overlayBottom}>
-          <Text style={styles.headerinfoText}>Workout</Text>
-          <View className='flex-row items-center space-x-3 mb-1'>
-            <View className="mr-3 bg-[#42779F] rounded-[10]">
-              <Ionicons className="m-2" name="flag" size={20} color="#FFFFFF" />
-            </View>
-            <View >
-              <Text style={styles.infodetailText}>Goal</Text>
-              <Text style={styles.infoText}>{goal}</Text>
-            </View>
+          {/* Streak badge */}
+          <View style={styles.overlayText}>
+            <Text style={styles.completedText}>{isReady ? completedCount : '–'}</Text>
+            <Text style={styles.completedText}>Streak</Text>
           </View>
-          <View className='flex-row items-center space-x-3 mb-1'>
-            <View className="mr-3 bg-[#42779F] rounded-[10]">
-              <Ionicons className="m-2" name="bar-chart" size={20} color="#FFFFFF" />
+
+          {/* info panel */}
+          <View style={styles.overlayBottom}>
+            <Text style={styles.headerinfoText}>Workout</Text>
+
+            <View style={styles.row}>
+              <View style={styles.iconBox}>
+                <Ionicons name="flag" size={20} color="#FFFFFF" />
+              </View>
+              <View>
+                <Text style={styles.infodetailText}>Goal</Text>
+                <Text style={styles.infoText}>{goal}</Text>
+              </View>
             </View>
-            <View >
-              <Text style={styles.infodetailText}>Level</Text>
-              <Text style={styles.infoText}>{fitnessLevel}</Text>
+
+            <View style={styles.row}>
+              <View style={styles.iconBox}>
+                <Ionicons name="bar-chart" size={20} color="#FFFFFF" />
+              </View>
+              <View>
+                <Text style={styles.infodetailText}>Level</Text>
+                <Text style={styles.infoText}>{fitnessLevel}</Text>
+              </View>
             </View>
-          </View>
-          <View className='flex-row items-center space-x-3 mb-1'>
-            <View className="mr-3 bg-[#42779F] rounded-[10]">
-              <Ionicons className="m-2" name="barbell" size={20} color="#FFFFFF" />
-            </View>
-            <View >
-              <Text style={styles.infodetailText}>Equipment</Text>
-              <Text style={styles.infoText}>{equipment}</Text>
+
+            <View style={styles.row}>
+              <View style={styles.iconBox}>
+                <Ionicons name="barbell" size={20} color="#FFFFFF" />
+              </View>
+              <View>
+                <Text style={styles.infodetailText}>Equipment</Text>
+                <Text style={styles.infoText}>{equipment}</Text>
+              </View>
             </View>
           </View>
         </View>
-      </View>
+      )}
     </View>
   );
 };
@@ -111,9 +143,8 @@ export const ProgressSection = () => {
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#42779F',
-    borderRadius: 20,
+    borderRadius: 12,
     padding: 16,
-    marginHorizontal: 16,
     marginBottom: 30,
   },
   title: {
@@ -156,22 +187,34 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     width: 150,
   },
-  infoText: {
+  headerinfoText: {
     color: 'white',
-    fontSize: 12,
+    fontSize: 15,
     fontWeight: 'bold',
     marginBottom: 4,
+    marginTop: 4,
   },
   infodetailText: {
     color: '#47aaf5',
     fontSize: 12,
     marginBottom: 2,
   },
-  headerinfoText: {
+  infoText: {
     color: 'white',
-    fontSize: 15,
-    fontWeight: "bold",
+    fontSize: 12,
+    fontWeight: 'bold',
     marginBottom: 4,
-    marginTop: 4,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 6,
+  },
+  iconBox: {
+    marginRight: 6,
+    backgroundColor: '#42779F',
+    borderRadius: 10,
+    padding: 6,
   },
 });

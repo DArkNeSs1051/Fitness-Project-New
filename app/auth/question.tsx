@@ -1,5 +1,4 @@
 import { useAuth, useUser } from "@clerk/clerk-expo";
-import { OPENAI_API_KEY } from "@env";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import dayjs from "dayjs";
@@ -11,7 +10,6 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import { httpsCallable } from "firebase/functions";
-import OpenAI from "openai";
 import React, { useEffect, useRef, useState } from "react";
 import {
   Keyboard,
@@ -78,7 +76,6 @@ export interface formInterface {
   index: number;
 }
 
-const client = new OpenAI({ apiKey: OPENAI_API_KEY });
 
 const Question = () => {
   const { user } = useUser();
@@ -226,7 +223,7 @@ const Question = () => {
       console.log("✅ Workout plan result:", result.data);
       setProgress(100);
       await new Promise((r) => setTimeout(r, 500));
-      router.replace("/workout");
+      router.replace("/(tabs)/workout");
     } catch (error) {
       console.error("❌ Error generating workout plan:", error);
       alert("เกิดข้อผิดพลาดในการสร้างแผนออกกำลังกาย");
@@ -313,25 +310,51 @@ const Question = () => {
         : "text-[#142939] border-[#142939] "
     );
 
-  const validateForm = () => {
-    const newErrors: typeof errors = {
-      gender: "",
-      birthday: "",
-      weight: "",
-      height: "",
-    };
+  const DECIMAL_RE = /^\d+([.,]\d+)?$/;
 
-    if (states === 1) {
-      newErrors.gender = form.gender ? "" : "กรุณาเลือกเพศ";
-      newErrors.birthday = form.birthday ? "" : "กรุณาเลือกวันเกิด";
-      newErrors.weight = /^\d+$/.test(form.weight) ? "" : "กรุณากรอกน้ำหนัก";
-      newErrors.height = /^\d+$/.test(form.height) ? "" : "กรุณากรอกส่วนสูง";
-    } else if (states === 2) {
+  function toNumberOrNull(s?: string) {
+    if (!s) return null;
+    const n = Number(s.replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  }
+
+
+  const validateForm = () => {
+  const newErrors = {
+    gender: '',
+    birthday: '',
+    weight: '',
+    height: '',
+  };
+
+  if (states === 1) {
+    newErrors.gender   = form.gender   ? '' : 'กรุณาเลือกเพศ';
+    newErrors.birthday = form.birthday ? '' : 'กรุณาเลือกวันเกิด';
+
+    // ตรวจรูปแบบ (ยอมรับทศนิยม)
+    if (!DECIMAL_RE.test(form.weight)) {
+      newErrors.weight = 'กรุณากรอกน้ำหนักให้ถูกต้อง';
+    }
+    if (!DECIMAL_RE.test(form.height)) {
+      newErrors.height = 'กรุณากรอกส่วนสูงให้ถูกต้อง';
     }
 
-    setErrors(newErrors);
-    return Object.values(newErrors).every((err) => err === "");
-  };
+    // แปลงเป็นตัวเลขแล้วเช็คช่วงสมเหตุสมผล
+    const w = toNumberOrNull(form.weight);
+    const h = toNumberOrNull(form.height);
+
+    if (w == null || w <= 0 || w > 400) {
+      newErrors.weight = 'น้ำหนักไม่สมเหตุสมผล';
+    }
+    if (h == null || h < 50 || h > 260) {
+      newErrors.height = 'ส่วนสูงไม่สมเหตุสมผล';
+    }
+  }
+
+  setErrors(newErrors);
+  return Object.values(newErrors).every((err) => err === '');
+};
+
 
   useEffect(() => {
     if (user?.id) {

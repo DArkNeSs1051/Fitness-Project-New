@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { FIRESTORE_DB } from '../firebase';
 
 type UserProfile = {
@@ -28,6 +28,10 @@ type UserStore = {
   isProfileComplete: boolean;
   isLoading: boolean;
   error: string | null;
+  _unsub?: () => void;
+  listenUserDoc: (userId: string) => void;
+  stopListen: () => void;
+
   setUserData: (data: Partial<UserProfile>) => void;
   clearUserData: () => void;
   reset: () => void;
@@ -45,13 +49,69 @@ const toMaybeDate = (v: any): Date | undefined => {
   return undefined;
 };
 
+const toNum = (v: any): number | undefined => {
+  if (typeof v === 'number') return v;
+  if (typeof v === 'string' && v.trim() !== '' && !Number.isNaN(Number(v))) return Number(v);
+  return undefined;
+};
+
+const normalizeUser = (userId: string, raw: any): UserProfile => ({
+  id: userId,
+  ...raw,
+  age: toNum(raw?.age),
+  height: toNum(raw?.height),
+  weight: toNum(raw?.weight),
+  workoutDay: toNum(raw?.workoutDay ?? raw?.day),
+  createdAt: toMaybeDate(raw?.createdAt) ?? raw?.createdAt,
+  updatedAt: toMaybeDate(raw?.updatedAt) ?? raw?.updatedAt,
+  birthday: toMaybeDate(raw?.birthday) ?? raw?.birthday,
+});
+
 export const useUserStore = create<UserStore>((set, get) => ({
   ownerId: null,
-
   user: null,
   isProfileComplete: false,
   isLoading: false,
   error: null,
+
+
+  listenUserDoc: (userId) => {
+    const prev = get()._unsub;
+    if (prev) prev();
+
+    set({ ownerId: userId, isLoading: true, error: null });
+
+    const ref = doc(FIRESTORE_DB, 'users', userId);
+    const unsub = onSnapshot(
+      ref,
+      (snap) => {
+        if (snap.exists()) {
+          const data = normalizeUser(userId, snap.data());
+          set({ user: data, isLoading: false });
+          get().checkProfileCompletion();
+        } else {
+          const newUser: UserProfile = {
+            id: userId,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          set({ user: newUser, isLoading: false });
+        }
+      },
+      (err) => {
+        console.error('Realtime user listener error:', err);
+        set({ error: 'Failed to listen user data', isLoading: false });
+      }
+    );
+
+    set({ _unsub: unsub });
+  },
+
+  stopListen: () => {
+    const prev = get()._unsub;
+    if (prev) prev();
+    set({ _unsub: undefined });
+  },
 
   setUserData: (data) => {
     const current = get().user ?? ({ id: '' } as UserProfile);
@@ -74,12 +134,15 @@ export const useUserStore = create<UserStore>((set, get) => ({
   },
 
   reset: () => {
+    const prev = get()._unsub;
+    if (prev) prev();
     set({
       ownerId: null,
       user: null,
       isProfileComplete: false,
       isLoading: false,
       error: null,
+      _unsub: undefined,
     });
   },
 
@@ -109,26 +172,16 @@ export const useUserStore = create<UserStore>((set, get) => ({
 
   loadUserDataFromFirestore: async (userId) => {
     try {
-      // switching users, clear data and set new ownerId
       if (get().ownerId !== userId) {
         set({ ownerId: userId, user: null });
       }
-
       set({ isLoading: true, error: null });
 
       const docRef = doc(FIRESTORE_DB, 'users', userId);
       const snap = await getDoc(docRef);
 
       if (snap.exists()) {
-        const raw = snap.data() as any;
-        const userData: UserProfile = {
-          id: userId,
-          ...raw,
-          createdAt: toMaybeDate(raw.createdAt) ?? raw.createdAt,
-          updatedAt: toMaybeDate(raw.updatedAt) ?? raw.updatedAt,
-          birthday: toMaybeDate(raw.birthday) ?? raw.birthday,
-        };
-        set({ user: userData });
+        set({ user: normalizeUser(userId, snap.data()) });
       } else {
         const newUser: UserProfile = {
           id: userId,
@@ -161,6 +214,10 @@ export const useUserStore = create<UserStore>((set, get) => ({
       const { id: _omit, ...rest } = user;
       const finalData = {
         ...rest,
+        age: toNum(rest.age),
+        height: toNum(rest.height),
+        weight: toNum(rest.weight),
+        workoutDay: toNum((rest as any).workoutDay ?? (rest as any).day),
         updatedAt: new Date(),
         createdAt: rest.createdAt ?? new Date(),
       };

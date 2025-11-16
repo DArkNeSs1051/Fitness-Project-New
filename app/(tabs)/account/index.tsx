@@ -1,9 +1,13 @@
-import React from "react";
-import { View, Text, TouchableOpacity } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, TouchableOpacity, Switch, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { shadows } from "~/utils/shadow";
 import { useClerk, useUser } from "@clerk/clerk-expo";
+import { getAuth } from "firebase/auth";
+import { useRoutineStore } from "~/store/useRoutineStore";
+import { useUserStore } from "~/store/useUserStore";
+
 
 export default function AccountScreen() {
   const { user } = useUser();
@@ -37,11 +41,17 @@ export default function AccountScreen() {
   );
 
   const handleSignOut = async () => {
+    const fb = getAuth();
     try {
-      await signOut();
-      router.replace("/auth");
-    } catch (err: any) {
-      alert(err.message || "Sign out error");
+      await Promise.allSettled([
+        signOut(),
+        fb.currentUser ? fb.signOut() : Promise.resolve(),
+      ]);
+    } finally {
+      useRoutineStore.getState().reset?.();
+      useUserStore.getState().reset?.();
+
+      router.replace("/auth/signin");
     }
   };
 
