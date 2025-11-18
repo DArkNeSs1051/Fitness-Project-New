@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { WebView } from "react-native-webview";
 import { useUser } from "@clerk/clerk-expo";
 import { useNavigation } from "expo-router";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { collection, doc, getDoc, getDocs, setDoc } from "firebase/firestore";
 import { FIRESTORE_DB } from "~/firebase";
 import { useFitnessFormStore } from "~/store/useFitnessFormStore";
 import { useUserStore } from "~/store/useUserStore";
@@ -18,6 +18,29 @@ export default function MFTTestScreen() {
   const navigation = useNavigation();
   const [ok, setOk] = useState(false);
 
+  const [b, setB] = useState<{ [field: string]: any }[] | undefined>(undefined);
+
+  // ------------------------------------------------------------------------
+  // โหลดข้อมูล exercises ก่อน
+  // ------------------------------------------------------------------------
+  useEffect(() => {
+    const checkData = async () => {
+      const userRef = collection(FIRESTORE_DB, "exercises");
+      const userDocSnap = await getDocs(userRef);
+
+      setB(
+        userDocSnap.docs.map((doc) => ({
+          ...doc.data(),
+        }))
+      );
+    };
+
+    checkData();
+  }, []);
+
+  // ------------------------------------------------------------------------
+  // ส่งข้อมูลเข้า WebView (แก้ให้ b ทัน ค่าใหม่เสมอ)
+  // ------------------------------------------------------------------------
   useEffect(() => {
     let cancelled = false;
     let intervalId: ReturnType<typeof setInterval> | null = null;
@@ -25,6 +48,7 @@ export default function MFTTestScreen() {
     const run = async () => {
       let effectiveGender: string | undefined = profileGender ?? formGender;
 
+      // โหลดข้อมูล gender/age จาก Firestore
       try {
         if (user?.id) {
           const userRef = doc(FIRESTORE_DB, "users", user.id);
@@ -50,12 +74,17 @@ export default function MFTTestScreen() {
         console.error("Failed to load user gender:", e);
       }
 
+      // รอจนกว่าจะมีค่า b ก่อนส่ง
+      if (!b) return;
+
       const sendToWeb = () => {
         const payload = {
           type: "FROM_TEST",
           gender: effectiveGender ?? formGender ?? "unknown",
           age: profileAge ?? useFitnessFormStore.getState().form?.age ?? null,
+          video: b ?? null,
         };
+
         const jsCode = `
           window.dispatchEvent(
             new MessageEvent('message', {
@@ -67,7 +96,10 @@ export default function MFTTestScreen() {
         webviewRef.current?.injectJavaScript(jsCode);
       };
 
+      // ส่งครั้งแรกทันที
       sendToWeb();
+
+      // ส่งทุก 2 วินาที (จะเห็นค่า b ใหม่ทุกครั้ง)
       intervalId = setInterval(sendToWeb, 2000);
     };
 
@@ -77,8 +109,18 @@ export default function MFTTestScreen() {
       cancelled = true;
       if (intervalId) clearInterval(intervalId);
     };
-  }, [user?.id, profileGender, formGender, setForm]);
+  }, [
+    user?.id,
+    profileGender,
+    formGender,
+    profileAge,
+    setForm,
+    b, // ⭐ สำคัญสุด: ทำให้ effect รันใหม่เมื่อ b มีค่า
+  ]);
 
+  // ------------------------------------------------------------------------
+  // รับ message จาก WebView
+  // ------------------------------------------------------------------------
   const onMessage = (event: any) => {
     try {
       const text = event?.nativeEvent?.data;
@@ -97,6 +139,9 @@ export default function MFTTestScreen() {
     }
   };
 
+  // ------------------------------------------------------------------------
+  // Save level เข้า Firestore
+  // ------------------------------------------------------------------------
   useEffect(() => {
     const saveLevel = async () => {
       if (!user?.id) return;
@@ -121,6 +166,9 @@ export default function MFTTestScreen() {
     saveLevel();
   }, [user?.id, ok]);
 
+  // ------------------------------------------------------------------------
+  // กลับหน้าก่อนหลังผ่าน 10 วิ
+  // ------------------------------------------------------------------------
   useEffect(() => {
     if (!ok) return;
     const timer = setTimeout(() => {
@@ -129,6 +177,9 @@ export default function MFTTestScreen() {
     return () => clearTimeout(timer);
   }, [ok, navigation]);
 
+  // ------------------------------------------------------------------------
+  // Return WebView
+  // ------------------------------------------------------------------------
   return (
     <WebView
       ref={webviewRef}
@@ -144,8 +195,10 @@ export default function MFTTestScreen() {
       allowUniversalAccessFromFileURLs
       mediaCapturePermissionGrantType="grant"
       onShouldStartLoadWithRequest={(req) => {
-        const clean = (s:string) => s.replace(/\/+$/, '');
-        return clean(req.url).startsWith(clean("https://newcamera-pi.vercel.app/"));
+        const clean = (s: string) => s.replace(/\/+$/, "");
+        return clean(req.url).startsWith(
+          clean("https://newcamera-pi.vercel.app/")
+        );
       }}
       onMessage={onMessage}
     />
