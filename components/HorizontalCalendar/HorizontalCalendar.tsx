@@ -33,7 +33,7 @@ const HorizontalCalendar: React.FC<Props> = ({ selectedDate, onSelectDate, worko
 
   return (
     <View className="p-4 bg-[#42779F] rounded-lg" style={shadows.large}>
-      {/* Month Header with Arrows */}
+      {/* Month Header */}
       <View className="flex-row justify-between items-center mb-2">
         <TouchableOpacity onPress={prevWeek}>
           <Ionicons name="chevron-back-outline" size={24} color="white" />

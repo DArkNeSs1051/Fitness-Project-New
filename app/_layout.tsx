@@ -18,7 +18,6 @@ import { useUserStore } from '~/store/useUserStore';
 import { getAuth, onAuthStateChanged, signInWithCustomToken } from 'firebase/auth';
 import { httpsCallable, getFunctions } from 'firebase/functions';
 import { FIREBASE_APP } from '~/firebase';
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
@@ -81,30 +80,11 @@ function UserRealtimeBridge() {
   return null; 
 }
 
-  Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-      shouldPlaySound: false,
-      shouldSetBadge: false,
-      shouldShowBanner: true,
-      shouldShowList: true,
-    }),
-  });
-
-
 export default function RootLayout() {
   const pathname = usePathname();
 
   useEffect(() => {
     SystemUI.setBackgroundColorAsync('#84BDEA');
-  }, []);
-
-  useEffect(() => {
-    if (Platform.OS === 'android') {
-      Notifications.setNotificationChannelAsync('workout-reminder', {
-        name: 'Workout Reminders',
-        importance: Notifications.AndroidImportance.DEFAULT,
-      });
-    }
   }, []);
 
   const shouldHideBottomNav =
