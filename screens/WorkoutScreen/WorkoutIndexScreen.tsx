@@ -1,17 +1,27 @@
 import React, { useEffect, useState } from "react";
-import { Image, SafeAreaView, Text, TouchableOpacity, View, ScrollView } from "react-native";
+import {
+  Image,
+  SafeAreaView,
+  Text,
+  TouchableOpacity,
+  View,
+  ScrollView,
+} from "react-native";
 import { useUser } from "@clerk/clerk-expo";
 import { Ionicons } from "@expo/vector-icons";
 import dayjs from "dayjs";
 import { useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { collection, getDocs } from "firebase/firestore";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
 import { FIRESTORE_DB } from "~/firebase";
 import { shadows } from "~/utils/shadow";
 import { Card } from "../../components/ui/card";
 import { ProgressSection } from "~/components/ProgressSection";
 import { BeforeAfterProgress } from "~/components/BeforeAfterProgress";
 import { fetchThumbUrlForTitle } from "~/utils/storageThumbs";
+import BasicTermsOverlay from "../../components/BasicTermOverlay";
 
 export type TExercise = {
   id: string;
@@ -30,12 +40,18 @@ export interface IRoutines {
   completed: boolean;
 }
 
+const getBasicTermsKey = (userId?: string | null) =>
+  userId
+    ? `has_seen_basic_terms_overlay_${userId}`
+    : "has_seen_basic_terms_overlay_anonymous";
+
 const WorkoutIndexScreen: React.FC = () => {
   const { user } = useUser();
   const router = useRouter();
 
   const [data, setData] = useState<IRoutines[]>([]);
   const [thumbUrl, setThumbUrl] = useState<string>("");
+  const [showBasicTerms, setShowBasicTerms] = useState(false);
 
   useEffect(() => {
     const fetchRoutines = async () => {
@@ -78,6 +94,33 @@ const WorkoutIndexScreen: React.FC = () => {
     };
   }, [todayWorkout?.title]);
 
+  useEffect(() => {
+    if (!user?.id) return; 
+
+    (async () => {
+      try {
+        const key = getBasicTermsKey(user.id);
+        const seen = await AsyncStorage.getItem(key);
+        if (!seen) {
+          setShowBasicTerms(true);
+        }
+      } catch (e) {
+        console.log("Error reading basic terms flag", e);
+        setShowBasicTerms(true);
+      }
+    })();
+  }, [user?.id]);
+
+  const handleCloseBasicTerms = async () => {
+    setShowBasicTerms(false);
+    try {
+      const key = getBasicTermsKey(user?.id);
+      await AsyncStorage.setItem(key, "true");
+    } catch (e) {
+      console.log("Error saving basic terms flag", e);
+    }
+  };
+
   const handleWorkoutPress = (id: string, item: IRoutines) => {
     router.push({
       pathname: `/workout/${id}`,
@@ -91,8 +134,27 @@ const WorkoutIndexScreen: React.FC = () => {
   return (
     <SafeAreaView className="flex-1 bg-[#84BDEA]">
       <StatusBar style="dark" />
-      <ScrollView className="flex-1 p-4 mt-5" showsVerticalScrollIndicator={false}>
-        <Text className="text-[#142939] text-3xl font-bold mb-4">Workout</Text>
+      <ScrollView
+        className="flex-1 p-4 mt-5"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="flex-row items-center justify-between mb-4">
+          <Text className="text-[#142939] text-3xl font-bold">Workout</Text>
+
+          <TouchableOpacity
+            onPress={() => setShowBasicTerms(true)}
+            className="flex-row items-center px-3 py-2 rounded-full bg-[#E6F0FF]"
+          >
+            <Ionicons
+              name="information-circle-outline"
+              size={20}
+              color="#42779F"
+            />
+            <Text className="text-s font-semibold text-[#42779F] ml-2">
+              Basic Vocabulary
+            </Text>
+          </TouchableOpacity>
+        </View>
 
         <View
           className="bg-[#42779F] rounded-[12px] p-4"
@@ -100,9 +162,7 @@ const WorkoutIndexScreen: React.FC = () => {
         >
           {todayWorkout ? (
             <TouchableOpacity
-              onPress={() =>
-                handleWorkoutPress(todayWorkout.id, todayWorkout)
-              }
+              onPress={() => handleWorkoutPress(todayWorkout.id, todayWorkout)}
             >
               <Card className="rounded-xl overflow-hidden border-0">
                 <View className="relative h-40">
@@ -163,10 +223,9 @@ const WorkoutIndexScreen: React.FC = () => {
                 Please Generate new workout plan to continued.
               </Text>
 
-              <Text className="text-white text-sm mt-1"> 
+              <Text className="text-white text-sm mt-1">
                 Or take a fitness test before generate.
               </Text>
-
             </TouchableOpacity>
           )}
         </View>
@@ -178,8 +237,12 @@ const WorkoutIndexScreen: React.FC = () => {
         <View className="mt-3">
           <ProgressSection />
         </View>
-
       </ScrollView>
+
+      <BasicTermsOverlay
+        visible={showBasicTerms}
+        onClose={handleCloseBasicTerms}
+      />
     </SafeAreaView>
   );
 };
